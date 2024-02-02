@@ -56,17 +56,13 @@ There are two examples: color, todo.
 
 The color example is a very basic drag/drop showcase where the user can drag colors into zones and change the zone's color. I would start here.
 
-<video width="320" height="240" controls>
-  <source src="docs/color_demo.mp4" type="video/mp4">
-</video>
+[Link to video](https://drive.google.com/file/d/1K1CCi2Lc90IUyDufsvoUBZmUCbeg6_Fi/view?usp=sharing)
 
 To run this examples: `cargo run -p color`
 
 The todo example is a basic todo board application similar to Trello. This is a much much more complex example as it handles custom highlighting and nested droppables, but it just shows you can make some pretty cool things with iced.
 
-<video width="320" height="240" controls>
-  <source src="docs/todo_demo.mp4" type="video/mp4">
-</video>
+[Link to video](https://drive.google.com/file/d/1MLOCk4Imd_oUnrTj_psbpYbwua976HmR/view?usp=sharing)
 
 To run this example try: `cargo run -p todo`
 
