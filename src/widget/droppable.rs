@@ -329,24 +329,25 @@ where
         tree: &'b mut Tree,
         layout: Layout<'_>,
         renderer: &Renderer,
+        _translation: Vector,
     ) -> Option<overlay::Element<'b, Message, Theme, Renderer>> {
         let state: &mut State = tree.state.downcast_mut::<State>();
         let mut children = tree.children.iter_mut();
         if self.drag_overlay {
             if let Action::Drag(_, _) = state.action {
-                return Some(overlay::Element::new(
-                    Point::ORIGIN,
-                    Box::new(Overlay {
-                        content: &self.content,
-                        tree: children.next().unwrap(),
-                        overlay_bounds: state.overlay_bounds,
-                    }),
-                ));
+                return Some(overlay::Element::new(Box::new(Overlay {
+                    content: &self.content,
+                    tree: children.next().unwrap(),
+                    overlay_bounds: state.overlay_bounds,
+                })));
             }
         }
-        self.content
-            .as_widget_mut()
-            .overlay(children.next().unwrap(), layout, renderer)
+        self.content.as_widget_mut().overlay(
+            children.next().unwrap(),
+            layout,
+            renderer,
+            _translation,
+        )
     }
 
     fn mouse_interaction(
@@ -430,13 +431,7 @@ impl<'a, 'b, Message, Theme, Renderer> overlay::Overlay<Message, Theme, Renderer
 where
     Renderer: renderer::Renderer,
 {
-    fn layout(
-        &mut self,
-        renderer: &Renderer,
-        _bounds: Size,
-        _position: Point,
-        _translation: Vector,
-    ) -> layout::Node {
+    fn layout(&mut self, renderer: &Renderer, _bounds: Size) -> layout::Node {
         Widget::<Message, Theme, Renderer>::layout(
             self.content.as_widget(),
             self.tree,
