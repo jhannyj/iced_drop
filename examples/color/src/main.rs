@@ -1,3 +1,4 @@
+use iced::widget::container::Id as CId;
 use iced::{
     advanced::widget::Id,
     theme,
@@ -9,7 +10,7 @@ use iced_drop::droppable;
 const HEADER_HEIGHT: f32 = 80.0;
 const COLORS_HEIGHT: f32 = 40.0;
 const COLORS_ROUNDNESS: f32 = 10.0;
-const COLORS_CONTAINER_WIDTH: f32 = 300.0;
+const COLORS_CONTAINER_WIDTH: f32 = 130.0;
 
 fn main() -> iced::Result {
     ColorDropper::run(iced::Settings::default())
@@ -21,9 +22,22 @@ enum Message {
     HandleZonesFound(DColor, Vec<(Id, Rectangle)>),
 }
 
-#[derive(Default)]
 struct ColorDropper {
-    zone_color: DColor,
+    left_color: DColor,
+    right_color: DColor,
+    left: iced::widget::container::Id,
+    right: iced::widget::container::Id,
+}
+
+impl Default for ColorDropper {
+    fn default() -> Self {
+        Self {
+            left_color: DColor::Default,
+            right_color: DColor::Default,
+            left: CId::new("left"),
+            right: CId::new("right"),
+        }
+    }
 }
 
 impl Application for ColorDropper {
@@ -53,8 +67,13 @@ impl Application for ColorDropper {
                     None,
                 );
             }
-            Message::HandleZonesFound(color, _zones) => {
-                self.zone_color = color;
+            Message::HandleZonesFound(color, zones) => {
+                let zone = &zones[0].0;
+                if *zone == self.left.clone().into() {
+                    self.left_color = color;
+                } else {
+                    self.right_color = color;
+                }
             }
         }
         iced::Command::none()
@@ -89,21 +108,36 @@ impl Application for ColorDropper {
             )))
             .height(Length::Fill)
             .width(Length::Fixed(COLORS_CONTAINER_WIDTH));
-        let drop_zone = container(
-            text(self.zone_color.fun_fact())
-                .size(20)
-                .style(theme::Text::Color(self.zone_color.text_color())),
-        )
-        .id(iced::widget::container::Id::new("drop_zone_1"))
-        .style(theme::Container::Custom(Box::new(
-            self.zone_color.container_style(false),
-        )))
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .center_x()
-        .center_y();
-        column![header, row![colors_holder, drop_zone]].into()
+        column![
+            header,
+            row![
+                colors_holder,
+                drop_zone(self.left_color, self.left.clone()),
+                drop_zone(self.right_color, self.right.clone())
+            ]
+        ]
+        .into()
     }
+}
+
+fn drop_zone<'a>(
+    color: DColor,
+    id: iced::widget::container::Id,
+) -> iced::Element<'a, Message, iced::Theme, iced::Renderer> {
+    container(
+        text(color.fun_fact())
+            .size(20)
+            .style(theme::Text::Color(color.text_color())),
+    )
+    .id(id)
+    .style(theme::Container::Custom(Box::new(
+        color.container_style(false),
+    )))
+    .width(Length::Fill)
+    .height(Length::Fill)
+    .center_x()
+    .center_y()
+    .into()
 }
 
 #[derive(Debug, Clone, Copy, Default)]
