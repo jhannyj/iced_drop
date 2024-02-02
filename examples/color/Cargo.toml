@@ -1,0 +1,8 @@
+[package]
+name = "color"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+iced = { git = "https://github.com/iced-rs/iced.git", features = ["advanced"] }
+iced_drop = { path = "../.." }
