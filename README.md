@@ -54,9 +54,21 @@ On Drop, we return a widget operation that looks for drop zones under the cursor
 
 There are two examples: color, todo.
 
-The color example is a very basic drag/drop showcase where the user can drag colors into zones and change the zone's color. I would start here.To run this examples: `cargo run -p color`
+The color example is a very basic drag/drop showcase where the user can drag colors into zones and change the zone's color. I would start here.
 
-The todo example is a basic todo board application similar to Trello. This is a much much more complex example as it handles custom highlighting and nested droppables, but it just shows you can make some pretty cool things with iced. To run this example try: `cargo run -p todo`
+<video width="320" height="240" controls>
+  <source src="docs/color_demo.mp4" type="video/mp4">
+</video>
+
+To run this examples: `cargo run -p color`
+
+The todo example is a basic todo board application similar to Trello. This is a much much more complex example as it handles custom highlighting and nested droppables, but it just shows you can make some pretty cool things with iced.
+
+<video width="320" height="240" controls>
+  <source src="docs/todo_demo.mp4" type="video/mp4">
+</video>
+
+To run this example try: `cargo run -p todo`
 
 Note: the todo example might also be a good example on how one can use operations. Check examples/todo/src/operation.rs. I didn't find any other examples of this in the iced repo except for the built in focus operations.
 
