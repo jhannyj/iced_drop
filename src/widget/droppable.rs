@@ -21,6 +21,7 @@ where
     on_cancel: Option<Message>,
     drag_overlay: bool,
     drag_hide: bool,
+    drag_center: bool,
     drag_size: Option<Size>,
     reset_delay: usize,
 }
@@ -41,6 +42,7 @@ where
             on_cancel: None,
             drag_overlay: true,
             drag_hide: false,
+            drag_center: false,
             drag_size: None,
             reset_delay: 0,
         }
@@ -93,6 +95,12 @@ where
     /// Sets whether the [`Droppable`] should be hidden while dragging.
     pub fn drag_hide(mut self, drag_hide: bool) -> Self {
         self.drag_hide = drag_hide;
+        self
+    }
+
+    /// Sets whether the [`Droppable`] should be centered on the cursor while dragging.
+    pub fn drag_center(mut self, drag_center: bool) -> Self {
+        self.drag_center = drag_center;
         self
     }
 
@@ -202,8 +210,13 @@ where
                         Action::Select(start) | Action::Drag(start, _) => {
                             state.action = Action::Drag(start, position);
                             // update the position of the overlay since the cursor was moved
-                            state.overlay_bounds.x = state.widget_pos.x + position.x - start.x;
-                            state.overlay_bounds.y = state.widget_pos.y + position.y - start.y;
+                            if self.drag_center {
+                                state.overlay_bounds.x = position.x - layout.bounds().width / 2.0;
+                                state.overlay_bounds.y = position.y - layout.bounds().height / 2.0;
+                            } else {
+                                state.overlay_bounds.x = state.widget_pos.x + position.x - start.x;
+                                state.overlay_bounds.y = state.widget_pos.y + position.y - start.y;
+                            }
                             // send on drag msg
                             if let Some(on_drag) = self.on_drag.as_deref() {
                                 let message = (on_drag)(position, state.overlay_bounds);
