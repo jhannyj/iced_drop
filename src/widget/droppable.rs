@@ -19,6 +19,7 @@ where
     on_drop: Option<Box<dyn Fn(Point, Rectangle) -> Message + 'a>>,
     on_drag: Option<Box<dyn Fn(Point, Rectangle) -> Message + 'a>>,
     on_cancel: Option<Message>,
+    drag_mode: Option<(bool, bool)>,
     drag_overlay: bool,
     drag_hide: bool,
     drag_size: Option<Size>,
@@ -39,6 +40,7 @@ where
             on_drop: None,
             on_drag: None,
             on_cancel: None,
+            drag_mode: Some((true, true)),
             drag_overlay: true,
             drag_hide: false,
             drag_size: None,
@@ -93,6 +95,12 @@ where
     /// Sets whether the [`Droppable`] should be hidden while dragging.
     pub fn drag_hide(mut self, drag_hide: bool) -> Self {
         self.drag_hide = drag_hide;
+        self
+    }
+
+    // Sets whether the [`Droppable`] can be dragged along individual axes.
+    pub fn drag_mode(mut self, drag_x: bool, drag_y: bool) -> Self {
+        self.drag_mode = Some((drag_x, drag_y));
         self
     }
 
@@ -198,8 +206,17 @@ where
                             }
                         }
                     }
-                    mouse::Event::CursorMoved { position } => match state.action {
+                    mouse::Event::CursorMoved { mut position } => match state.action {
                         Action::Select(start) | Action::Drag(start, _) => {
+                            // calculate the new position of the widget after dragging
+
+                            if let Some((drag_x, drag_y)) = self.drag_mode {
+                                position = Point {
+                                    x: if drag_x { position.x } else { start.x },
+                                    y: if drag_y { position.y } else { start.y },
+                                };
+                            }
+
                             state.action = Action::Drag(start, position);
                             // update the position of the overlay since the cursor was moved
                             state.overlay_bounds.x = state.widget_pos.x + position.x - start.x;
