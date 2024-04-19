@@ -99,12 +99,12 @@ where
     }
 
     // Sets whether the [`Droppable`] can be dragged along individual axes.
-    pub fn drag_mode(mut self, drag_mode_x: bool, drag_mode_y: bool) -> Self {
+    pub fn drag_mode(mut self, drag_x: bool, drag_y: bool) -> Self {
         debug_assert!(
-            drag_mode_x | drag_mode_y,
-            "Drag mode must drag on at least x or y axes"
+            drag_x | drag_y,
+            "A Droppable must be draggable on at least one axis"
         );
-        self.drag_mode = (drag_mode_x, drag_mode_y);
+        self.drag_mode = (drag_x, drag_y);
         self
     }
 
