@@ -19,6 +19,7 @@ where
     on_drop: Option<Box<dyn Fn(Point, Rectangle) -> Message + 'a>>,
     on_drag: Option<Box<dyn Fn(Point, Rectangle) -> Message + 'a>>,
     on_cancel: Option<Message>,
+    drag_mode: (bool, bool),
     drag_overlay: bool,
     drag_hide: bool,
     drag_size: Option<Size>,
@@ -39,6 +40,7 @@ where
             on_drop: None,
             on_drag: None,
             on_cancel: None,
+            drag_mode: (true, true),
             drag_overlay: true,
             drag_hide: false,
             drag_size: None,
@@ -93,6 +95,16 @@ where
     /// Sets whether the [`Droppable`] should be hidden while dragging.
     pub fn drag_hide(mut self, drag_hide: bool) -> Self {
         self.drag_hide = drag_hide;
+        self
+    }
+
+    // Sets whether the [`Droppable`] can be dragged along individual axes.
+    pub fn drag_mode(mut self, drag_mode_x: bool, drag_mode_y: bool) -> Self {
+        debug_assert!(
+            drag_mode_x | drag_mode_y,
+            "Drag mode must drag on at least x or y axes"
+        );
+        self.drag_mode = (drag_mode_x, drag_mode_y);
         self
     }
 
@@ -200,6 +212,21 @@ where
                     }
                     mouse::Event::CursorMoved { position } => match state.action {
                         Action::Select(start) | Action::Drag(start, _) => {
+                            let mut position = position;
+                            if self.drag_mode.0 | self.drag_mode.1 {
+                                position = Point {
+                                    x: if self.drag_mode.0 {
+                                        position.x
+                                    } else {
+                                        start.x
+                                    },
+                                    y: if self.drag_mode.1 {
+                                        position.y
+                                    } else {
+                                        start.y
+                                    },
+                                };
+                            }
                             state.action = Action::Drag(start, position);
                             // update the position of the overlay since the cursor was moved
                             state.overlay_bounds.x = state.widget_pos.x + position.x - start.x;
