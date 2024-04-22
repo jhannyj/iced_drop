@@ -1,6 +1,9 @@
 use iced::{
-    advanced::widget::{operation::Outcome, Id, Operation},
-    Rectangle,
+    advanced::widget::{
+        operation::{Outcome, Scrollable},
+        Id, Operation,
+    },
+    Rectangle, Vector,
 };
 
 /// Produces an [`Operation`] that will find the drop zones that pass a filter on the zone's bounds.
@@ -22,6 +25,7 @@ where
         zones: Vec<(Id, Rectangle)>,
         max_depth: Option<usize>,
         c_depth: usize,
+        offset: Vector,
     }
 
     impl<F> Operation<Vec<(Id, Rectangle)>> for FindDropZone<F>
@@ -40,6 +44,7 @@ where
                         Some(options) => options.contains(id),
                         None => true,
                     };
+                    let bounds = bounds - self.offset;
                     if is_option && (self.filter)(&bounds) {
                         self.c_depth += 1;
                         self.zones.push((id.clone(), bounds));
@@ -59,6 +64,18 @@ where
         fn finish(&self) -> Outcome<Vec<(Id, Rectangle)>> {
             Outcome::Some(self.zones.clone())
         }
+
+        fn scrollable(
+            &mut self,
+            _state: &mut dyn Scrollable,
+            _id: Option<&Id>,
+            bounds: Rectangle,
+            translation: Vector,
+        ) {
+            if (self.filter)(&bounds) {
+                self.offset = self.offset + translation;
+            }
+        }
     }
 
     FindDropZone {
@@ -67,5 +84,6 @@ where
         zones: vec![],
         max_depth: depth,
         c_depth: 0,
+        offset: Vector { x: 0.0, y: 0.0 },
     }
 }
