@@ -3,8 +3,10 @@ name = "iced_drop"
 version = "0.1.0"
 edition = "2021"
 
-[dependencies]
-iced = { git = "https://github.com/iced-rs/iced.git", features = ["advanced"] }
+[dependencies.iced]
+git = "https://github.com/iced-rs/iced.git"
+rev = "a05b8044a9a82c1802d4d97f1723e24b9d9dad9c"
+features = ["advanced"]
 
 [workspace]
 members = ["examples/*"]
