@@ -16,6 +16,7 @@ where
     content: Element<'a, Message, Theme, Renderer>,
     id: Option<iced::advanced::widget::Id>,
     on_click: Option<Message>,
+    on_single_click: Option<Message>,
     on_drop: Option<Box<dyn Fn(Point, Rectangle) -> Message + 'a>>,
     on_drag: Option<Box<dyn Fn(Point, Rectangle) -> Message + 'a>>,
     on_cancel: Option<Message>,
@@ -38,6 +39,7 @@ where
             content: content.into(),
             id: None,
             on_click: None,
+            on_single_click: None,
             on_drop: None,
             on_drag: None,
             on_cancel: None,
@@ -59,6 +61,12 @@ where
     /// Sets the message that will be produced when the [`Droppable`] is clicked.
     pub fn on_click(mut self, message: Message) -> Self {
         self.on_click = Some(message);
+        self
+    }
+
+    /// Sets the message that will be produced when the [`Droppable`] is clicked, but not dragged.
+    pub fn on_single_click(mut self, message: Message) -> Self {
+        self.on_single_click = Some(message);
         self
     }
 
@@ -228,8 +236,10 @@ where
                             state.action = Action::Drag(start, position);
                             // update the position of the overlay since the cursor was moved
                             if self.drag_center {
-                                state.overlay_bounds.x = position.x - state.overlay_bounds.width / 2.0;
-                                state.overlay_bounds.y = position.y - state.overlay_bounds.height / 2.0;
+                                state.overlay_bounds.x =
+                                    position.x - state.overlay_bounds.width / 2.0;
+                                state.overlay_bounds.y =
+                                    position.y - state.overlay_bounds.height / 2.0;
                             } else {
                                 state.overlay_bounds.x = state.widget_pos.x + position.x - start.x;
                                 state.overlay_bounds.y = state.widget_pos.y + position.y - start.y;
@@ -246,6 +256,9 @@ where
                         if btn == mouse::Button::Left {
                             match state.action {
                                 Action::Select(_) => {
+                                    if let Some(on_single_click) = self.on_single_click.clone() {
+                                        shell.publish(on_single_click);
+                                    }
                                     state.action = Action::None;
                                 }
                                 Action::Drag(_, current) => {
