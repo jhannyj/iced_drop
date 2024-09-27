@@ -228,8 +228,10 @@ where
                             state.action = Action::Drag(start, position);
                             // update the position of the overlay since the cursor was moved
                             if self.drag_center {
-                                state.overlay_bounds.x = position.x - state.overlay_bounds.width / 2.0;
-                                state.overlay_bounds.y = position.y - state.overlay_bounds.height / 2.0;
+                                state.overlay_bounds.x =
+                                    position.x - state.overlay_bounds.width / 2.0;
+                                state.overlay_bounds.y =
+                                    position.y - state.overlay_bounds.height / 2.0;
                             } else {
                                 state.overlay_bounds.x = state.widget_pos.x + position.x - start.x;
                                 state.overlay_bounds.y = state.widget_pos.y + position.y - start.y;
@@ -315,7 +317,7 @@ where
         tree: &mut Tree,
         layout: Layout<'_>,
         renderer: &Renderer,
-        operation: &mut dyn Operation<Message>,
+        operation: &mut dyn Operation,
     ) {
         let state = tree.state.downcast_mut::<State>();
         operation.custom(state, self.id.as_ref());

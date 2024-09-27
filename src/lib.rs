@@ -1,8 +1,10 @@
 pub mod widget;
 
 use iced::{
-    advanced::{graphics::futures::MaybeSend, renderer, widget::Id},
-    Command, Element, Point, Rectangle,
+    advanced::widget::{operate, Id},
+    advanced::{graphics::futures::MaybeSend, renderer},
+    task::Task,
+    Element, Point, Rectangle,
 };
 
 use widget::droppable::*;
@@ -18,17 +20,17 @@ where
     Droppable::new(content)
 }
 
-pub fn zones_on_point<Message, MF>(
+pub fn zones_on_point<T, MF>(
     msg: MF,
     point: Point,
     options: Option<Vec<Id>>,
     depth: Option<usize>,
-) -> Command<Message>
+) -> Task<T>
 where
-    Message: 'static,
-    MF: Fn(Vec<(Id, Rectangle)>) -> Message + MaybeSend + Sync + Clone + 'static,
+    T: Send + 'static,
+    MF: Fn(Vec<(Id, Rectangle)>) -> T + MaybeSend + Sync + Clone + 'static,
 {
-    Command::widget(drop::find_zones(
+    operate(drop::find_zones(
         move |bounds| bounds.contains(point),
         options,
         depth,
@@ -41,11 +43,11 @@ pub fn find_zones<Message, MF, F>(
     filter: F,
     options: Option<Vec<Id>>,
     depth: Option<usize>,
-) -> Command<Message>
+) -> Task<Message>
 where
-    Message: 'static,
+    Message: Send + 'static,
     MF: Fn(Vec<(Id, Rectangle)>) -> Message + MaybeSend + Sync + Clone + 'static,
-    F: Fn(&Rectangle) -> bool + 'static,
+    F: Fn(&Rectangle) -> bool + Send + 'static,
 {
-    Command::widget(drop::find_zones(filter, options, depth)).map(move |id| msg(id))
+    operate(drop::find_zones(filter, options, depth)).map(move |id| msg(id))
 }

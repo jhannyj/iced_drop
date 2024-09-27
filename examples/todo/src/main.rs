@@ -7,12 +7,12 @@ use highlight::{should_update_droppable, zone_update, Highlight, Highlightable, 
 use iced::{
     advanced::widget::Id,
     widget::{column, container, text, text_input},
-    Application, Command, Length, Point, Rectangle,
+    Element, Length, Point, Rectangle, Task,
 };
 use iced_drop::find_zones;
 use iced_drop::widget::droppable::State as DroppableState;
 use operation::swap_modify_states;
-use tree::{List, Slot, Task, TreeData, TreeElement, TreeLocation};
+use tree::{List, Slot, Todo, TreeData, TreeElement, TreeLocation};
 
 mod highlight;
 mod operation;
@@ -23,34 +23,43 @@ const HEADER_HEIGHT: f32 = 80.0;
 const DOUBLE_CLICK_TIME: u128 = 500;
 
 fn main() -> iced::Result {
-    TodoBoard::run(iced::Settings::default())
+    iced::application(TodoBoard::title, TodoBoard::update, TodoBoard::view)
+        .theme(TodoBoard::theme)
+        .run()
 }
 
 #[derive(Debug, Clone)]
 enum Message {
-    // Task editing
-    EditTask(TreeLocation, iced::widget::text_input::Id),
-    UpdateTask(TreeLocation, String),
-    StopEditingTask,
-    // Task creation
-    UpdateTaskWriter(TreeLocation, String),
-    WriteTask(TreeLocation),
-    // Drag/drop
-    DragTask(TreeLocation, Point, Rectangle),
-    HandleTaskZones(Vec<(Id, Rectangle)>),
-    DropTask(TreeLocation, Point, Rectangle),
+    // To-do editing
+    EditTodo(TreeLocation, iced::widget::text_input::Id),
+    UpdateTodo(TreeLocation, String),
+    StopEditingTodo,
+
+    // To-do creation
+    UpdateTodoWriter(TreeLocation, String),
+    WriteTodo(TreeLocation),
+
+    // Drag/drop to-dos
+    DragTodo(TreeLocation, Point, Rectangle),
+    HandleTodoZones(Vec<(Id, Rectangle)>),
+    #[allow(dead_code)]
+    DropTodo(TreeLocation, Point, Rectangle),
+    TodoDropCanceled,
+
+    // Drag/drop lists
+    #[allow(dead_code)]
     DragList(TreeLocation, Point, Rectangle),
     HandleListZones(Vec<(Id, Rectangle)>),
+    #[allow(dead_code)]
     DropList(TreeLocation, Point, Rectangle),
-    TaskDropCanceled,
     ListDropCanceled,
 }
 
 struct TodoBoard {
     tree: TreeData,
-    clicked_task: (TreeLocation, Instant),
-    editing_task: Option<TreeLocation>,
-    tasks_highlight: highlight::Highlight,
+    clicked: (TreeLocation, Instant),
+    editing: Option<TreeLocation>,
+    todos_highlight: highlight::Highlight,
     lists_highlight: highlight::Highlight,
 }
 
@@ -58,41 +67,33 @@ impl Default for TodoBoard {
     fn default() -> Self {
         Self {
             tree: TreeData::new(vec![
-                Slot::new(List::new("Todo", vec![Task::new("Fix bugs")])),
-                Slot::new(List::new("Doing", vec![Task::new("Write code")])),
-                Slot::new(List::new("Done", vec![Task::new("Drag and drop")])),
+                Slot::new(List::new("Todo", vec![Todo::new("Fix bugs")])),
+                Slot::new(List::new("Doing", vec![Todo::new("Write code")])),
+                Slot::new(List::new("Done", vec![Todo::new("Drag and drop")])),
             ]),
-            clicked_task: (tree::NULL_TASK_LOC, Instant::now()),
-            editing_task: None,
-            tasks_highlight: Highlight::default(),
+            clicked: (tree::NULL_TODO_LOC, Instant::now()),
+            editing: None,
+            todos_highlight: Highlight::default(),
             lists_highlight: Highlight::default(),
         }
     }
 }
 
-impl iced::Application for TodoBoard {
-    type Executor = iced::executor::Default;
-
-    type Message = Message;
-
-    type Theme = theme::Board;
-
-    type Flags = ();
-
-    fn new(_flags: Self::Flags) -> (Self, iced::Command<Self::Message>) {
-        (TodoBoard::default(), iced::Command::none())
-    }
-
+impl TodoBoard {
     fn title(&self) -> String {
         "Todo".to_string()
     }
 
-    fn view(&self) -> iced::Element<'_, Self::Message, Self::Theme, iced::Renderer> {
-        let header = container(text("TODO Board").size(30).style(theme::Text::Title))
+    fn theme(&self) -> iced::Theme {
+        iced::Theme::CatppuccinFrappe
+    }
+
+    fn view(&self) -> Element<'_, Message> {
+        let header = container(text("TODO Board").size(30).style(theme::text::title))
             .padding(10.0)
             .width(Length::Fill)
             .height(Length::Fixed(HEADER_HEIGHT))
-            .style(theme::Container::Title);
+            .style(theme::container::title);
         container(
             column![header, self.tree.view()]
                 .height(Length::Fill)
@@ -100,73 +101,73 @@ impl iced::Application for TodoBoard {
         )
         .width(Length::Fill)
         .height(Length::Fill)
-        .style(theme::Container::Background)
+        .style(theme::container::background)
         .into()
     }
 
-    fn update(&mut self, message: Self::Message) -> iced::Command<Self::Message> {
+    fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::EditTask(t_loc, ti_id) => {
-                self.stop_editing_task();
+            Message::EditTodo(t_loc, ti_id) => {
+                self.stop_editing();
 
-                let (clicked, time) = &self.clicked_task;
+                let (clicked, time) = &self.clicked;
                 if *clicked == t_loc && time.elapsed().as_millis() < DOUBLE_CLICK_TIME {
-                    if let Some(task) = self.tree.task_mut(&t_loc) {
-                        task.editing = true;
-                        self.editing_task = Some(t_loc);
+                    if let Some(todo) = self.tree.todo_mut(&t_loc) {
+                        todo.editing = true;
+                        self.editing = Some(t_loc);
                         return text_input::focus(ti_id);
                     }
                 }
-                self.clicked_task = (t_loc, Instant::now());
+                self.clicked = (t_loc, Instant::now());
             }
-            Message::UpdateTask(t_loc, content) => {
-                if let Some(task) = self.tree.task_mut(&t_loc) {
-                    task.content = content;
+            Message::UpdateTodo(t_loc, content) => {
+                if let Some(todo) = self.tree.todo_mut(&t_loc) {
+                    todo.content = content;
                 }
             }
-            Message::StopEditingTask => {
-                self.stop_editing_task();
+            Message::StopEditingTodo => {
+                self.stop_editing();
             }
-            // Task drag/drop
-            Message::DragTask(t_loc, __, t_bounds) => {
+            // To-do drag/drop
+            Message::DragTodo(t_loc, __, t_bounds) => {
                 let new_highlight =
-                    highlight::dragged(&self.tasks_highlight, t_loc.clone(), t_bounds);
-                if should_update_droppable(&self.tasks_highlight, &new_highlight, &t_loc) {
-                    if let Some(task) = self.tree.task_mut(&t_loc) {
-                        task.set_highlight(true)
+                    highlight::dragged(&self.todos_highlight, t_loc.clone(), t_bounds);
+                if should_update_droppable(&self.todos_highlight, &new_highlight, &t_loc) {
+                    if let Some(todo) = self.tree.todo_mut(&t_loc) {
+                        todo.set_highlight(true)
                     }
                 }
-                self.tasks_highlight = new_highlight;
+                self.todos_highlight = new_highlight;
                 return find_zones(
-                    Message::HandleTaskZones,
+                    Message::HandleTodoZones,
                     move |zone_bounds| zone_bounds.intersects(&t_bounds),
-                    Some(self.tree.task_options(&t_loc)),
+                    Some(self.tree.todo_options(&t_loc)),
                     None,
                 );
             }
-            Message::HandleTaskZones(zones) => {
+            Message::HandleTodoZones(zones) => {
                 let new_highlight =
-                    highlight::zones_found(&self.tasks_highlight, &map_zones(&self.tree, zones));
-                zone_update(&self.tasks_highlight, &new_highlight).update(
+                    highlight::zones_found(&self.todos_highlight, &map_zones(&self.tree, zones));
+                zone_update(&self.todos_highlight, &new_highlight).update(
                     &mut self.tree,
-                    &self.tasks_highlight,
+                    &self.todos_highlight,
                     &new_highlight,
                 );
-                self.tasks_highlight = new_highlight;
+                self.todos_highlight = new_highlight;
             }
-            Message::DropTask(t_loc, _, _) => {
-                if let Some(h_loc) = &self.tasks_highlight.hovered {
+            Message::DropTodo(t_loc, _, _) => {
+                if let Some(h_loc) = &self.todos_highlight.hovered {
                     match h_loc.element() {
-                        TreeElement::List => task_dropped_on_list(&mut self.tree, &t_loc, &h_loc),
-                        TreeElement::Task(_) => {
-                            task_dropped_on_task(&mut self.tree, &t_loc, &h_loc)
+                        TreeElement::List => todo_dropped_on_list(&mut self.tree, &t_loc, &h_loc),
+                        TreeElement::Todo(_) => {
+                            todo_dropped_on_todo(&mut self.tree, &t_loc, &h_loc)
                         }
                         _ => (),
                     }
                 } else {
-                    self.tree.list_mut(&t_loc).remove_task(&t_loc);
+                    self.tree.list_mut(&t_loc).remove(&t_loc);
                 }
-                self.tasks_highlight = highlight::dropped();
+                self.todos_highlight = highlight::dropped();
             }
 
             // List drag/drop
@@ -204,34 +205,34 @@ impl iced::Application for TodoBoard {
                 if let Some(s_loc) = &self.lists_highlight.hovered {
                     self.tree.slot_mut(s_loc.slot()).set_highlight(false);
                 }
-                self.tasks_highlight = highlight::dropped();
+                self.todos_highlight = highlight::dropped();
             }
-            Message::UpdateTaskWriter(l_loc, new_str) => {
-                self.stop_editing_task();
-                self.tree.list_mut(&l_loc).task_adder.text = new_str;
+            Message::UpdateTodoWriter(l_loc, new_str) => {
+                self.stop_editing();
+                self.tree.list_mut(&l_loc).todo_adder.text = new_str;
             }
-            Message::WriteTask(l_loc) => {
+            Message::WriteTodo(l_loc) => {
                 let (text, id) = {
-                    let adder = &mut self.tree.list_mut(&l_loc).task_adder;
+                    let adder = &mut self.tree.list_mut(&l_loc).todo_adder;
                     let text = adder.text.clone();
                     adder.text.clear();
                     (text, adder.id())
                 };
                 if text.is_empty() {
-                    return Command::none();
+                    return Task::none();
                 }
-                let task = Task::new(&text);
-                self.tree.list_mut(&l_loc).push_task(task);
+                let todo = Todo::new(&text);
+                self.tree.list_mut(&l_loc).push(todo);
                 return text_input::focus(id);
             }
-            Message::TaskDropCanceled => {
-                if let Some(d_loc) = &self.tasks_highlight.dragging {
-                    if let Some(task) = self.tree.task_mut(&d_loc.0) {
-                        task.set_highlight(false);
-                        highlight::set_hovered(&mut self.tree, &self.tasks_highlight, false);
+            Message::TodoDropCanceled => {
+                if let Some(d_loc) = &self.todos_highlight.dragging {
+                    if let Some(todo) = self.tree.todo_mut(&d_loc.0) {
+                        todo.set_highlight(false);
+                        highlight::set_hovered(&mut self.tree, &self.todos_highlight, false);
                     }
                 }
-                self.tasks_highlight = highlight::dropped();
+                self.todos_highlight = highlight::dropped();
             }
             Message::ListDropCanceled => {
                 if let Some(d_loc) = &self.lists_highlight.dragging {
@@ -241,16 +242,16 @@ impl iced::Application for TodoBoard {
                 self.lists_highlight = highlight::dropped();
             }
         }
-        Command::none()
+        Task::none()
     }
 }
 
 impl TodoBoard {
-    fn stop_editing_task(&mut self) {
-        if let Some(loc) = self.editing_task {
-            if let Some(task) = self.tree.task_mut(&loc) {
-                task.editing = false;
-                self.editing_task = None;
+    fn stop_editing(&mut self) {
+        if let Some(loc) = self.editing {
+            if let Some(todo) = self.tree.todo_mut(&loc) {
+                todo.editing = false;
+                self.editing = None;
             }
         }
     }
@@ -269,43 +270,43 @@ fn map_zones(tree: &TreeData, zones: Vec<(Id, Rectangle)>) -> Vec<(TreeLocation,
         .collect()
 }
 
-fn task_dropped_on_list(tree: &mut TreeData, d_loc: &TreeLocation, h_loc: &TreeLocation) {
-    if let Some(task) = tree.task_mut(d_loc) {
-        task.set_highlight(false);
-        let task = {
+fn todo_dropped_on_list(tree: &mut TreeData, d_loc: &TreeLocation, h_loc: &TreeLocation) {
+    if let Some(todo) = tree.todo_mut(d_loc) {
+        todo.set_highlight(false);
+        let todo = {
             let list = tree.list_mut(h_loc);
             list.set_highlight(false);
             if d_loc.slot() == h_loc.slot() {
                 return;
             }
-            if let Some(task) = tree.list_mut(d_loc).remove_task(d_loc) {
-                task
+            if let Some(todo) = tree.list_mut(d_loc).remove(d_loc) {
+                todo
             } else {
                 return;
             }
         };
-        tree.list_mut(h_loc).push_task(task);
+        tree.list_mut(h_loc).push(todo);
     }
 }
 
-fn task_dropped_on_task(tree: &mut TreeData, d_loc: &TreeLocation, h_loc: &TreeLocation) {
-    if let Some(d_task) = tree.task_mut(d_loc) {
-        d_task.set_highlight(false);
-        let h_task = tree.task_mut(h_loc);
-        if let Some(task) = h_task {
-            task.set_highlight(false);
+fn todo_dropped_on_todo(tree: &mut TreeData, d_loc: &TreeLocation, h_loc: &TreeLocation) {
+    if let Some(d_todo) = tree.todo_mut(d_loc) {
+        d_todo.set_highlight(false);
+        let h_todo = tree.todo_mut(h_loc);
+        if let Some(todo) = h_todo {
+            todo.set_highlight(false);
         } else {
             return;
         }
     }
 
     if d_loc.slot() != h_loc.slot() {
-        if let TreeElement::Task(i) = h_loc.element() {
-            let task = tree.list_mut(d_loc).remove_task(d_loc).unwrap();
-            tree.list_mut(h_loc).inser_task(task, *i);
+        if let TreeElement::Todo(i) = h_loc.element() {
+            let todo = tree.list_mut(d_loc).remove(d_loc).unwrap();
+            tree.list_mut(h_loc).insert(todo, *i);
         }
     } else {
-        tree.list_mut(d_loc).move_task(d_loc, h_loc);
+        tree.list_mut(d_loc).move_todo(d_loc, h_loc);
     }
 }
 
@@ -313,7 +314,7 @@ fn move_list_to_zone(
     tree: &mut TreeData,
     d_loc: &TreeLocation,
     h_loc: &TreeLocation,
-) -> Command<Message> {
+) -> Task<Message> {
     let l1 = tree.list_mut(d_loc).id();
     let l2 = tree.list_mut(h_loc).id();
     tree.swap_lists(d_loc, h_loc);
