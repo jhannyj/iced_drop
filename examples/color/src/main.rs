@@ -1,9 +1,9 @@
 use iced::widget::container::Id as CId;
+use iced::Border;
 use iced::{
     advanced::widget::Id,
-    theme,
     widget::{column, container, row, text},
-    Application, Border, Length, Point, Rectangle,
+    Element, Fill, Length, Point, Rectangle, Task,
 };
 use iced_drop::droppable;
 
@@ -13,7 +13,13 @@ const COLORS_ROUNDNESS: f32 = 10.0;
 const COLORS_CONTAINER_WIDTH: f32 = 130.0;
 
 fn main() -> iced::Result {
-    ColorDropper::run(iced::Settings::default())
+    iced::application(
+        ColorDropper::title,
+        ColorDropper::update,
+        ColorDropper::view,
+    )
+    .theme(ColorDropper::theme)
+    .run()
 }
 
 #[derive(Debug, Clone)]
@@ -40,24 +46,16 @@ impl Default for ColorDropper {
     }
 }
 
-impl Application for ColorDropper {
-    type Executor = iced::executor::Default;
-
-    type Message = Message;
-
-    type Theme = iced::theme::Theme;
-
-    type Flags = ();
-
-    fn new(_flags: Self::Flags) -> (Self, iced::Command<Self::Message>) {
-        (Self::default(), iced::Command::none())
-    }
-
+impl ColorDropper {
     fn title(&self) -> String {
         "Basic".to_string()
     }
 
-    fn update(&mut self, message: Self::Message) -> iced::Command<Self::Message> {
+    fn theme(&self) -> iced::Theme {
+        iced::Theme::CatppuccinFrappe
+    }
+
+    fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::DropColor(color, point, _bounds) => {
                 return iced_drop::zones_on_point(
@@ -68,20 +66,20 @@ impl Application for ColorDropper {
                 );
             }
             Message::HandleZonesFound(color, zones) => {
-                let zone = &zones[0].0;
-                if *zone == self.left.clone().into() {
-                    self.left_color = color;
-                } else {
-                    self.right_color = color;
+                if let Some((zone, _)) = zones.get(0) {
+                    if *zone == self.left.clone().into() {
+                        self.left_color = color;
+                    } else {
+                        self.right_color = color;
+                    }
                 }
             }
         }
-        iced::Command::none()
+        Task::none()
     }
 
-    fn view(&self) -> iced::Element<'_, Self::Message, Self::Theme, iced::Renderer> {
+    fn view(&self) -> Element<'_, Message> {
         let header = container(text("Color Dropper").size(30))
-            .style(theme::Container::Box)
             .padding(10.0)
             .width(Length::Fill)
             .height(Length::Fixed(HEADER_HEIGHT));
@@ -89,11 +87,8 @@ impl Application for ColorDropper {
             let color = *color;
             droppable(
                 container(text(color.to_string()).size(20))
-                    .center_x()
-                    .center_y()
-                    .style(theme::Container::Custom(Box::new(
-                        DColor::White.container_style(true),
-                    )))
+                    .center(Fill)
+                    .style(move |_| color.style())
                     .width(Length::Fill)
                     .height(Length::Fixed(COLORS_HEIGHT)),
             )
@@ -101,11 +96,7 @@ impl Application for ColorDropper {
             .into()
         });
         let colors_holder = container(column(colors).spacing(20.0).padding(20.0))
-            .center_x()
-            .center_y()
-            .style(theme::Container::Custom(Box::new(
-                DColor::Background.container_style(false),
-            )))
+            .center(Fill)
             .height(Length::Fill)
             .width(Length::Fixed(COLORS_CONTAINER_WIDTH));
         column![
@@ -115,7 +106,9 @@ impl Application for ColorDropper {
                 drop_zone(self.left_color, self.left.clone()),
                 drop_zone(self.right_color, self.right.clone())
             ]
+            .spacing(5)
         ]
+        .padding(5)
         .into()
     }
 }
@@ -124,27 +117,19 @@ fn drop_zone<'a>(
     color: DColor,
     id: iced::widget::container::Id,
 ) -> iced::Element<'a, Message, iced::Theme, iced::Renderer> {
-    container(
-        text(color.fun_fact())
-            .size(20)
-            .style(theme::Text::Color(color.text_color())),
-    )
-    .id(id)
-    .style(theme::Container::Custom(Box::new(
-        color.container_style(false),
-    )))
-    .width(Length::Fill)
-    .height(Length::Fill)
-    .center_x()
-    .center_y()
-    .into()
+    container(text(color.fun_fact()).size(20))
+        .style(move |_| color.style())
+        .id(id)
+        .width(Fill)
+        .height(Fill)
+        .center(Fill)
+        .into()
 }
 
 #[derive(Debug, Clone, Copy, Default)]
 enum DColor {
     #[default]
     Default,
-    Background,
     Red,
     Green,
     Blue,
@@ -179,18 +164,17 @@ impl DColor {
 
     fn color(&self) -> iced::Color {
         match self {
-            DColor::Default => iced::Color::WHITE,
-            DColor::Background => iced::Color::from_rgb8(165, 42, 42),
-            DColor::Red => iced::Color::from_rgb8(255, 0, 0),
-            DColor::Green => iced::Color::from_rgb8(0, 255, 0),
-            DColor::Blue => iced::Color::from_rgb8(0, 0, 255),
-            DColor::Yellow => iced::Color::from_rgb8(255, 255, 0),
-            DColor::Purple => iced::Color::from_rgb8(128, 0, 128),
-            DColor::Orange => iced::Color::from_rgb8(255, 165, 0),
-            DColor::Black => iced::Color::BLACK,
-            DColor::White => iced::Color::WHITE,
-            DColor::Gray => iced::Color::from_rgb8(128, 128, 128),
-            DColor::Pink => iced::Color::from_rgb8(255, 192, 203),
+            DColor::Default => iced::Color::from_rgb8(245, 245, 245),
+            DColor::Red => iced::Color::from_rgb8(220, 20, 20),
+            DColor::Green => iced::Color::from_rgb8(50, 205, 50),
+            DColor::Blue => iced::Color::from_rgb8(40, 80, 150),
+            DColor::Yellow => iced::Color::from_rgb8(255, 215, 0),
+            DColor::Purple => iced::Color::from_rgb8(100, 50, 150),
+            DColor::Orange => iced::Color::from_rgb8(255, 140, 0),
+            DColor::Black => iced::Color::from_rgb8(20, 20, 20),
+            DColor::White => iced::Color::from_rgb8(250, 250, 250),
+            DColor::Gray => iced::Color::from_rgb8(105, 105, 105),
+            DColor::Pink => iced::Color::from_rgb8(255, 105, 180),
         }
     }
 
@@ -206,10 +190,16 @@ impl DColor {
         }
     }
 
-    fn container_style(&self, droppable: bool) -> ContainerStyle {
-        ContainerStyle {
-            color: self.color(),
-            droppable,
+    fn style(&self) -> container::Style {
+        iced::widget::container::Style {
+            background: Some(self.color().into()),
+            border: Border {
+                color: iced::Color::BLACK,
+                width: 1.0,
+                radius: COLORS_ROUNDNESS.into(),
+            },
+            text_color: Some(self.text_color()),
+            ..Default::default()
         }
     }
 
@@ -226,29 +216,6 @@ impl DColor {
             DColor::White => "White is the color of purity and innocence",
             DColor::Gray => "Gray is the color of compromise and control",
             DColor::Pink => "Pink is the color of love and compassion",
-            DColor::Background => "Hacker level achieved",
-        }
-    }
-}
-
-struct ContainerStyle {
-    color: iced::Color,
-    droppable: bool,
-}
-
-impl iced::widget::container::StyleSheet for ContainerStyle {
-    type Style = iced::Theme;
-
-    fn appearance(&self, _style: &Self::Style) -> container::Appearance {
-        let border = if self.droppable {
-            Border::with_radius(COLORS_ROUNDNESS)
-        } else {
-            Border::default()
-        };
-        container::Appearance {
-            background: Some(iced::Background::Color(self.color)),
-            border,
-            ..Default::default()
         }
     }
 }

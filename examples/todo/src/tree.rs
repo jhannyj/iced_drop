@@ -6,13 +6,13 @@ use iced::widget::tooltip;
 use iced::{
     alignment,
     widget::{button, column, container, horizontal_space, row, text, text_input},
-    Element, Length, Size,
+    Center, Element, Length, Size,
 };
 use iced_drop::droppable;
 
 use crate::{highlight::Highlightable, theme, Message};
 
-pub const NULL_TASK_LOC: TreeLocation = TreeLocation {
+pub const NULL_TODO_LOC: TreeLocation = TreeLocation {
     slot: 0,
     element: TreeElement::Slot,
 };
@@ -41,7 +41,7 @@ impl TreeLocation {
 pub enum TreeElement {
     Slot,
     List,
-    Task(usize),
+    Todo(usize),
 }
 
 pub struct ElementAdder {
@@ -49,7 +49,7 @@ pub struct ElementAdder {
     id: iced::widget::text_input::Id,
 }
 
-/// Contains tasks organized by slots, and lists
+/// Contains items organized by slots, and lists
 pub struct TreeData {
     slots: Vec<Slot>,
 }
@@ -59,7 +59,7 @@ impl TreeData {
         Self { slots }
     }
     /// Convert the tree into an element that iced can render
-    pub fn view(&self) -> Element<Message, theme::Board, iced::Renderer> {
+    pub fn view(&self) -> Element<Message> {
         let children = self.slots.iter().enumerate().map(|(i, slot)| slot.view(i));
         row(children)
             .spacing(10.0)
@@ -77,9 +77,9 @@ impl TreeData {
             if slot.list.id == *id {
                 return Some(TreeLocation::new(i, TreeElement::List));
             }
-            for (j, list) in slot.list.tasks.iter().enumerate() {
+            for (j, list) in slot.list.todos.iter().enumerate() {
                 if list.id == *id {
-                    return Some(TreeLocation::new(i, TreeElement::Task(j)));
+                    return Some(TreeLocation::new(i, TreeElement::Todo(j)));
                 }
             }
         }
@@ -95,25 +95,25 @@ impl TreeData {
         match location.element {
             TreeElement::Slot => &mut self.slots[i].list,
             TreeElement::List => &mut self.slots[i].list,
-            TreeElement::Task(_) => &mut self.slots[i].list,
+            TreeElement::Todo(_) => &mut self.slots[i].list,
         }
     }
 
-    pub fn task(&self, location: &TreeLocation) -> Option<&Task> {
+    pub fn todo(&self, location: &TreeLocation) -> Option<&Todo> {
         let i = location.slot;
         match location.element {
             TreeElement::Slot => None,
             TreeElement::List => None,
-            TreeElement::Task(j) => Some(&self.slots[i].list.tasks[j]),
+            TreeElement::Todo(j) => Some(&self.slots[i].list.todos[j]),
         }
     }
 
-    pub fn task_mut(&mut self, location: &TreeLocation) -> Option<&mut Task> {
+    pub fn todo_mut(&mut self, location: &TreeLocation) -> Option<&mut Todo> {
         let i = location.slot;
         match location.element {
             TreeElement::Slot => None,
             TreeElement::List => None,
-            TreeElement::Task(j) => Some(&mut self.slots[i].list.tasks[j]),
+            TreeElement::Todo(j) => Some(&mut self.slots[i].list.todos[j]),
         }
     }
 
@@ -126,19 +126,19 @@ impl TreeData {
         std::mem::swap(&mut s1.list, &mut s2.list);
     }
 
-    /// Returns the widget Id of all the widgets wich a task can be dropped on
-    pub fn task_options(&self, t_loc: &TreeLocation) -> Vec<Id> {
-        let task_id = if let Some(task) = self.task(t_loc) {
-            task.id.clone()
+    /// Returns the widget Id of all the widgets wich a item can be dropped on
+    pub fn todo_options(&self, t_loc: &TreeLocation) -> Vec<Id> {
+        let todo_id = if let Some(todo) = self.todo(t_loc) {
+            todo.id.clone()
         } else {
             return vec![];
         };
         self.slots
             .iter()
             .map(|slot| {
-                slot.list.tasks.iter().filter_map(|task| {
-                    if task.id != task_id {
-                        Some(task.id.clone())
+                slot.list.todos.iter().filter_map(|todo| {
+                    if todo.id != todo_id {
+                        Some(todo.id.clone())
                     } else {
                         None
                     }
@@ -185,13 +185,13 @@ impl Slot {
     }
 
     /// Convert the slot into an element that iced can render
-    fn view(&self, index: usize) -> Element<Message, theme::Board, iced::Renderer> {
+    fn view(&self, index: usize) -> Element<Message> {
         container(self.list.view(index))
             .id(self.c_id.clone())
             .style(if self.highlight {
-                theme::Container::ActiveSlot
+                theme::container::active_slot
             } else {
-                theme::Container::Default
+                container::transparent
             })
             .width(Length::Fill)
             .height(Length::Fill)
@@ -203,7 +203,7 @@ impl Slot {
 impl ElementAdder {
     pub fn new(id: usize) -> Self {
         Self {
-            id: iced::widget::text_input::Id::new(format!("task_adder_{}", id)),
+            id: iced::widget::text_input::Id::new(format!("todo_adder_{}", id)),
             text: String::new(),
         }
     }
@@ -215,12 +215,13 @@ impl ElementAdder {
 
 static NEXT_LIST: AtomicUsize = AtomicUsize::new(0);
 
-/// Some list that contains tasks and can be dragged into a slot. Tasks can also be dragged into a list.
+/// Some list that contains to-do tasks and can be dragged into a slot.
+/// Tasks can also be dragged into a list.
 pub struct List {
-    pub task_adder: ElementAdder,
+    pub todo_adder: ElementAdder,
     id: Id,
     title: String,
-    tasks: Vec<Task>,
+    todos: Vec<Todo>,
     highlight: bool,
 }
 
@@ -232,38 +233,38 @@ impl Highlightable for List {
 
 impl List {
     /// Create a new list with a title
-    pub fn new(title: &str, tasks: Vec<Task>) -> Self {
+    pub fn new(title: &str, todos: Vec<Todo>) -> Self {
         let id = NEXT_LIST.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         Self {
             id: Id::new(format!("list_{}", id)),
             title: title.to_string(),
-            task_adder: ElementAdder::new(id),
-            tasks,
+            todo_adder: ElementAdder::new(id),
+            todos,
             highlight: false,
         }
     }
 
-    pub fn remove_task(&mut self, loc: &TreeLocation) -> Option<Task> {
-        if let TreeElement::Task(i) = loc.element() {
-            Some(self.tasks.remove(*i))
+    pub fn remove(&mut self, loc: &TreeLocation) -> Option<Todo> {
+        if let TreeElement::Todo(i) = loc.element() {
+            Some(self.todos.remove(*i))
         } else {
             None
         }
     }
 
-    pub fn push_task(&mut self, task: Task) {
-        self.tasks.push(task);
+    pub fn push(&mut self, todo: Todo) {
+        self.todos.push(todo);
     }
 
-    pub fn inser_task(&mut self, task: Task, index: usize) {
-        self.tasks.insert(index, task);
+    pub fn insert(&mut self, todo: Todo, index: usize) {
+        self.todos.insert(index, todo);
     }
 
-    pub fn move_task(&mut self, from: &TreeLocation, to: &TreeLocation) {
-        if let (TreeElement::Task(i), TreeElement::Task(j)) = (from.element(), to.element()) {
+    pub fn move_todo(&mut self, from: &TreeLocation, to: &TreeLocation) {
+        if let (TreeElement::Todo(i), TreeElement::Todo(j)) = (from.element(), to.element()) {
             let insert_index = if i < j { j - 1 } else { *j };
-            let task = self.tasks.remove(*i);
-            self.tasks.insert(insert_index, task);
+            let todo = self.todos.remove(*i);
+            self.todos.insert(insert_index, todo);
         }
     }
 
@@ -272,33 +273,33 @@ impl List {
     }
 
     /// Convert the list into an element that iced can render
-    fn view(&self, slot_index: usize) -> Element<Message, theme::Board, iced::Renderer> {
+    fn view(&self, slot_index: usize) -> Element<Message> {
         let name = text(self.title.clone())
             .size(20)
-            .style(theme::Text::ListName);
+            .style(theme::text::list_name);
         let location = TreeLocation::new(slot_index, TreeElement::List);
-        let tasks = column(
-            self.tasks
+        let todos = column(
+            self.todos
                 .iter()
                 .enumerate()
-                .map(|(i, task)| task.view(TreeLocation::new(slot_index, TreeElement::Task(i)))),
+                .map(|(i, todo)| todo.view(TreeLocation::new(slot_index, TreeElement::Todo(i)))),
         )
         .spacing(10.0)
         .width(Length::Fill)
         .height(Length::Shrink)
-        .push(self.task_adder(location));
-        let content = container(column![name, tasks].spacing(20.0))
+        .push(self.adder(location));
+        let content = container(column![name, todos].spacing(20.0))
             .width(Length::Fill)
             .height(Length::Shrink)
             .padding(10.0)
             .style(if self.highlight {
-                theme::Container::ActiveList
+                theme::container::active_list
             } else {
-                theme::Container::List
+                theme::container::list
             });
         droppable(content)
             .id(self.id.clone())
-            .on_click(Message::StopEditingTask)
+            .on_click(Message::StopEditingTodo)
             .on_drop(move |p, r| Message::DropList(location, p, r))
             .on_drag(move |p, r| Message::DragList(location, p, r))
             .on_cancel(Message::ListDropCanceled)
@@ -306,37 +307,33 @@ impl List {
             .into()
     }
 
-    fn task_adder(&self, location: TreeLocation) -> Element<Message, theme::Board, iced::Renderer> {
-        let input = text_input("Add task...", self.task_adder.text.as_str())
-            .id(self.task_adder.id.clone())
-            .on_input(move |new_str| Message::UpdateTaskWriter(location, new_str))
-            .on_submit(Message::WriteTask(location))
-            .style(theme::TextInput::ElementAdder)
+    fn adder(&self, location: TreeLocation) -> Element<Message> {
+        let input = text_input("Add task...", self.todo_adder.text.as_str())
+            .id(self.todo_adder.id.clone())
+            .on_input(move |new_str| Message::UpdateTodoWriter(location, new_str))
+            .on_submit(Message::WriteTodo(location))
+            .style(theme::text_input::element_adder)
             .size(14.0)
             .width(Length::Fill);
-        let spacing = horizontal_space(Length::Fixed(10.0));
+        let spacing = horizontal_space().width(Length::Fixed(10.0));
         let add_btn = tooltip(
-            button(
-                text("+")
-                    .vertical_alignment(alignment::Vertical::Center)
-                    .horizontal_alignment(alignment::Horizontal::Center),
-            )
-            .on_press(Message::WriteTask(location))
-            .style(theme::Button::Adder)
-            .width(Length::Fixed(30.0)),
+            button(text("+").align_y(Center).align_x(Center))
+                .on_press(Message::WriteTodo(location))
+                .style(theme::button::adder)
+                .width(Length::Fixed(30.0)),
             "Add task",
             tooltip::Position::FollowCursor,
         )
-        .style(theme::Container::TaskAdderTooltip);
+        .style(theme::container::adder_tooltip);
         row![input, spacing, add_btn].width(Length::Fill).into()
     }
 }
 
-static NEXT_TASK: AtomicUsize = AtomicUsize::new(0);
+static NEXT_TODO: AtomicUsize = AtomicUsize::new(0);
 
-/// Some task that can be dragged into a list
+/// Some to-do task that can be dragged into a list
 #[derive(Debug)]
-pub struct Task {
+pub struct Todo {
     pub content: String,
     pub editing: bool,
     id: Id,
@@ -344,19 +341,19 @@ pub struct Task {
     highlight: bool,
 }
 
-impl Highlightable for Task {
+impl Highlightable for Todo {
     fn set_highlight(&mut self, highlight: bool) {
         self.highlight = highlight;
     }
 }
 
-impl Task {
-    /// Create a new task with some content
+impl Todo {
+    /// Create a new to-do task with some content
     pub fn new(content: &str) -> Self {
-        let id = NEXT_TASK.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let id = NEXT_TODO.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         Self {
-            id: Id::new(format!("task_{}", id)),
-            t_id: iced::widget::text_input::Id::new(format!("task_input_{}", id)),
+            id: Id::new(format!("todo_{}", id)),
+            t_id: iced::widget::text_input::Id::new(format!("todo_input_{}", id)),
             content: content.to_string(),
             highlight: false,
             editing: false,
@@ -364,29 +361,28 @@ impl Task {
     }
 
     /// Convert the task into an element that iced can render
-    fn view(&self, location: TreeLocation) -> Element<Message, theme::Board, iced::Renderer> {
-        let txt: iced::advanced::widget::Text<'_, theme::Board, iced::Renderer> =
-            text(&self.content)
-                .size(15)
-                .style(theme::Text::Task)
-                .vertical_alignment(alignment::Vertical::Center);
+    fn view(&self, location: TreeLocation) -> Element<Message> {
+        let txt = text(&self.content)
+            .size(15)
+            .style(theme::text::todo)
+            .align_y(Center);
         let content = container(txt)
             .align_y(alignment::Vertical::Center)
             .padding(10.0)
             .width(Length::Fill)
             .height(Length::Shrink)
             .style(if self.highlight {
-                theme::Container::ActiveTask
+                theme::container::active_todo
             } else {
-                theme::Container::Task
+                theme::container::todo
             });
         let element = if !self.editing {
             droppable(content)
                 .id(self.id.clone())
-                .on_click(Message::EditTask(location, self.t_id.clone()))
-                .on_drop(move |p, r| Message::DropTask(location, p, r))
-                .on_drag(move |p, r| Message::DragTask(location, p, r))
-                .on_cancel(Message::TaskDropCanceled)
+                .on_click(Message::EditTodo(location, self.t_id.clone()))
+                .on_drop(move |p, r| Message::DropTodo(location, p, r))
+                .on_drag(move |p, r| Message::DragTodo(location, p, r))
+                .on_cancel(Message::TodoDropCanceled)
                 .drag_hide(true)
                 .drag_size(Size::ZERO)
                 .into()
@@ -395,8 +391,8 @@ impl Task {
                 .id(self.t_id.clone())
                 .padding(10.0)
                 .size(15)
-                .on_input(move |new_str| Message::UpdateTask(location, new_str))
-                .on_submit(Message::StopEditingTask)
+                .on_input(move |new_str| Message::UpdateTodo(location, new_str))
+                .on_submit(Message::StopEditingTodo)
                 .into()
         };
         element

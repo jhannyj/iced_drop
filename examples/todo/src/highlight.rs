@@ -36,7 +36,7 @@ pub fn zones_found(info: &Highlight, zones: &Vec<(TreeLocation, Rectangle)>) -> 
         let mut split_zones: [Vec<(TreeLocation, Rectangle)>; 2] = [vec![], vec![]];
         for zone in zones {
             let is_task = match zone.0.element() {
-                TreeElement::Task(_) => true,
+                TreeElement::Todo(_) => true,
                 _ => false,
             };
 
@@ -104,8 +104,8 @@ pub fn set_hovered(tree: &mut TreeData, info: &Highlight, highlight: bool) {
         match loc.element() {
             &TreeElement::Slot => tree.slot_mut(loc.slot()).set_highlight(highlight),
             &TreeElement::List => tree.list_mut(&loc).set_highlight(highlight),
-            &TreeElement::Task(_) => {
-                if let Some(task) = tree.task_mut(&loc) {
+            &TreeElement::Todo(_) => {
+                if let Some(task) = tree.todo_mut(&loc) {
                     task.set_highlight(highlight);
                 }
             }

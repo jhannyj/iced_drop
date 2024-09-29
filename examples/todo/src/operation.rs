@@ -1,19 +1,15 @@
 use iced::{
-    advanced::widget::{Id, Operation},
-    Command,
+    advanced::widget::{operate, Id, Operation},
+    Task,
 };
 
-pub fn swap_modify_states<Message, State, Modify>(
-    t1: Id,
-    t2: Id,
-    modify: Modify,
-) -> Command<Message>
+pub fn swap_modify_states<Message, State, Modify>(t1: Id, t2: Id, modify: Modify) -> Task<Message>
 where
-    Message: 'static,
-    State: Clone + 'static,
-    Modify: Fn(&State, &State) -> State + Clone + 'static,
+    Message: Send + 'static,
+    State: Clone + Send + 'static,
+    Modify: Fn(&State, &State) -> State + Clone + Send + 'static,
 {
-    Command::widget(swap_modify_states_operation(t1, t2, modify))
+    operate(swap_modify_states_operation(t1, t2, modify))
 }
 
 pub fn swap_modify_states_operation<T, State, Modify>(
@@ -22,13 +18,13 @@ pub fn swap_modify_states_operation<T, State, Modify>(
     modify: Modify,
 ) -> impl Operation<T>
 where
-    State: Clone + 'static,
-    Modify: Fn(&State, &State) -> State + Clone + 'static,
+    State: Clone + Send + 'static,
+    Modify: Fn(&State, &State) -> State + Clone + Send + 'static,
 {
     struct FindTargets<State, Modify>
     where
-        State: Clone + 'static,
-        Modify: Fn(&State, &State) -> State + Clone + 'static,
+        State: Clone + Send + 'static,
+        Modify: Fn(&State, &State) -> State + Clone + Send + 'static,
     {
         t1: Id,
         t2: Id,
@@ -39,8 +35,8 @@ where
 
     impl<T, State, Modify> Operation<T> for FindTargets<State, Modify>
     where
-        State: Clone + 'static,
-        Modify: Fn(&State, &State) -> State + Clone + 'static,
+        State: Clone + Send + 'static,
+        Modify: Fn(&State, &State) -> State + Clone + Send + 'static,
     {
         fn container(
             &mut self,
@@ -105,8 +101,8 @@ where
 
     impl<T, State, Modify> Operation<T> for SwapModify<State, Modify>
     where
-        State: Clone + 'static,
-        Modify: Fn(&State, &State) -> State + Clone + 'static,
+        State: Clone + Send + 'static,
+        Modify: Fn(&State, &State) -> State + Clone + Send + 'static,
     {
         fn container(
             &mut self,
