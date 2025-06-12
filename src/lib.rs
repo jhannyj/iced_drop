@@ -1,12 +1,10 @@
 pub mod widget;
 
-use iced::{
-    advanced::widget::{operate, Id},
-    advanced::{graphics::futures::MaybeSend, renderer},
-    task::Task,
-    Element, Point, Rectangle,
-};
-
+use iced::advanced::graphics::futures::MaybeSend;
+use iced::advanced::renderer;
+use iced::advanced::widget::{operate, Id};
+use iced::task::Task;
+use iced::{Element, Point, Rectangle};
 use widget::droppable::*;
 use widget::operation::drop;
 
@@ -46,7 +44,11 @@ pub fn find_zones<Message, MF, F>(
 ) -> Task<Message>
 where
     Message: Send + 'static,
-    MF: Fn(Vec<(Id, Rectangle)>) -> Message + MaybeSend + Sync + Clone + 'static,
+    MF: Fn(Vec<(Id, Rectangle)>) -> Message
+        + MaybeSend
+        + Sync
+        + Clone
+        + 'static,
     F: Fn(&Rectangle) -> bool + Send + 'static,
 {
     operate(drop::find_zones(filter, options, depth)).map(move |id| msg(id))

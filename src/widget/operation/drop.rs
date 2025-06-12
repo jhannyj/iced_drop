@@ -1,10 +1,6 @@
-use iced::{
-    advanced::widget::{
-        operation::{Outcome, Scrollable},
-        Id, Operation,
-    },
-    Rectangle, Vector,
-};
+use iced::advanced::widget::operation::{Outcome, Scrollable};
+use iced::advanced::widget::{Id, Operation};
+use iced::{Rectangle, Vector};
 
 /// Produces an [`Operation`] that will find the drop zones that pass a filter on the zone's bounds.
 /// For any drop zone to be considered, the Element must have some Id.
@@ -36,7 +32,9 @@ where
             &mut self,
             id: Option<&Id>,
             bounds: iced::Rectangle,
-            operate_on_children: &mut dyn FnMut(&mut dyn Operation<Vec<(Id, Rectangle)>>),
+            operate_on_children: &mut dyn FnMut(
+                &mut dyn Operation<Vec<(Id, Rectangle)>>,
+            ),
         ) {
             match id {
                 Some(id) => {
@@ -67,11 +65,11 @@ where
 
         fn scrollable(
             &mut self,
-            _state: &mut dyn Scrollable,
             _id: Option<&Id>,
             bounds: Rectangle,
             _content_bounds: Rectangle,
             translation: Vector,
+            _state: &mut dyn Scrollable,
         ) {
             if (self.filter)(&bounds) {
                 self.offset = self.offset + translation;

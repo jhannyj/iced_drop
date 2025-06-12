@@ -118,11 +118,10 @@ impl TreeData {
     }
 
     pub fn swap_lists(&mut self, l1: &TreeLocation, l2: &TreeLocation) {
-        let [s1, s2] = if let Ok(slots) = self.slots.get_many_mut([l1.slot, l2.slot]) {
-            slots
-        } else {
+        let Ok([s1, s2]) = self.slots.get_disjoint_mut([l1.slot, l2.slot]) else {
             return;
         };
+
         std::mem::swap(&mut s1.list, &mut s2.list);
     }
 

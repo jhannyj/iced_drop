@@ -1,8 +1,8 @@
 [package]
 name = "todo"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
-iced = { version = "0.13", features = ["advanced"] }
+iced.workspace = true
 iced_drop = { path = "../.." }

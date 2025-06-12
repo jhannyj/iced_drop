@@ -1,6 +1,6 @@
 use iced::{
     advanced::widget::{operate, Id, Operation},
-    Task,
+    Rectangle, Task,
 };
 
 pub fn swap_modify_states<Message, State, Modify>(t1: Id, t2: Id, modify: Modify) -> Task<Message>
@@ -50,7 +50,7 @@ where
             operate_on_children(self);
         }
 
-        fn custom(&mut self, state: &mut dyn std::any::Any, id: Option<&Id>) {
+        fn custom(&mut self, id: Option<&Id>, _bounds: Rectangle, state: &mut dyn std::any::Any) {
             if self.t1_state.is_some() && self.t2_state.is_some() {
                 return;
             }
@@ -116,7 +116,7 @@ where
             operate_on_children(self);
         }
 
-        fn custom(&mut self, state: &mut dyn std::any::Any, id: Option<&Id>) {
+        fn custom(&mut self, id: Option<&Id>, _bounds: Rectangle, state: &mut dyn std::any::Any) {
             if self.swapped_t1 && self.swapped_t2 {
                 return;
             }

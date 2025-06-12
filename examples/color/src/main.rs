@@ -14,10 +14,11 @@ const COLORS_CONTAINER_WIDTH: f32 = 130.0;
 
 fn main() -> iced::Result {
     iced::application(
-        ColorDropper::title,
+        ColorDropper::default,
         ColorDropper::update,
         ColorDropper::view,
     )
+    .title(ColorDropper::title)
     .theme(ColorDropper::theme)
     .run()
 }

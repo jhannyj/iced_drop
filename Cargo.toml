@@ -1,10 +1,14 @@
 [package]
 name = "iced_drop"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
-[dependencies.iced]
-version = "0.13"
+[dependencies]
+iced.workspace = true
+
+[workspace.dependencies.iced]
+git = "https://github.com/iced-rs/iced"
+branch = "master"
 features = ["advanced"]
 
 [workspace]

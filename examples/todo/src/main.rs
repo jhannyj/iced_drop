@@ -1,6 +1,3 @@
-#![feature(get_many_mut)]
-#![feature(hash_raw_entry)]
-
 use std::time::Instant;
 
 use highlight::{should_update_droppable, zone_update, Highlight, Highlightable, ZoneUpdate};
@@ -23,7 +20,8 @@ const HEADER_HEIGHT: f32 = 80.0;
 const DOUBLE_CLICK_TIME: u128 = 500;
 
 fn main() -> iced::Result {
-    iced::application(TodoBoard::title, TodoBoard::update, TodoBoard::view)
+    iced::application(TodoBoard::default, TodoBoard::update, TodoBoard::view)
+        .title(TodoBoard::title)
         .theme(TodoBoard::theme)
         .run()
 }
