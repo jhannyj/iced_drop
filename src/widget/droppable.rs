@@ -4,7 +4,7 @@ use std::vec;
 
 use iced::advanced::widget::{Operation, Tree, Widget};
 use iced::advanced::{self, Layout, layout, mouse, overlay, renderer};
-use iced::{Element, Point, Rectangle, Size, Vector};
+use iced::{Element, Pixels, Point, Rectangle, Size, Vector};
 
 /// An element that can be dragged and dropped on a [`DropZone`]
 pub struct Droppable<
@@ -18,6 +18,7 @@ pub struct Droppable<
 {
     content: Element<'a, Message, Theme, Renderer>,
     id: Option<iced::advanced::widget::Id>,
+    drag_threshold: f32,
     on_press: Option<Message>,
     on_click: Option<Message>,
     on_drop: Option<Box<dyn Fn(Point, Rectangle) -> Message + 'a>>,
@@ -44,6 +45,7 @@ where
         Self {
             content: content.into(),
             id: None,
+            drag_threshold: 5.0,
             on_press: None,
             on_click: None,
             on_drop: None,
@@ -62,6 +64,17 @@ where
     /// Sets the unique identifier of the [`Droppable`].
     pub fn id(mut self, id: iced::advanced::widget::Id) -> Self {
         self.id = Some(id);
+        self
+    }
+
+    /// Sets the drag threshold of the [`Droppable`].
+    ///
+    /// This controls when [`on_press`] will be triggered (if set) after selecting a droppable and
+    /// moving the cursor.
+    ///
+    /// [`on_press`]: Droppable::on_press
+    pub fn drag_threshold(mut self, drag_threshold: impl Into<Pixels>) -> Self {
+        self.drag_threshold = drag_threshold.into().0;
         self
     }
 
@@ -241,13 +254,13 @@ where
                             Action::Select(start) => {
                                 // Check if cursor has moved from the initial click position
                                 // (in case there was a micro-movement, might happen on trackpad)
-                                let drag_threshold = 5.0;
                                 let distance = ((position.x - start.x).powi(2)
                                     + (position.y - start.y).powi(2))
                                 .sqrt();
 
-                                if distance >= drag_threshold {
-                                    state.action = Action::Drag(start, position);
+                                if distance >= self.drag_threshold {
+                                    state.action =
+                                        Action::Drag(start, position);
                                     true
                                 } else {
                                     false
@@ -265,34 +278,47 @@ where
                                 // Apply drag mode constraints
                                 if let Some((drag_x, drag_y)) = self.drag_mode {
                                     position = Point {
-                                        x: if drag_x { position.x } else { start.x },
-                                        y: if drag_y { position.y } else { start.y },
+                                        x: if drag_x {
+                                            position.x
+                                        } else {
+                                            start.x
+                                        },
+                                        y: if drag_y {
+                                            position.y
+                                        } else {
+                                            start.y
+                                        },
                                     };
                                 }
 
                                 // update the position of the overlay since the cursor was moved
                                 if self.drag_center {
-                                    state.overlay_bounds.x =
-                                        position.x - state.overlay_bounds.width / 2.0;
-                                    state.overlay_bounds.y =
-                                        position.y - state.overlay_bounds.height / 2.0;
+                                    state.overlay_bounds.x = position.x
+                                        - state.overlay_bounds.width / 2.0;
+                                    state.overlay_bounds.y = position.y
+                                        - state.overlay_bounds.height / 2.0;
                                 } else {
-                                    state.overlay_bounds.x =
-                                        state.widget_pos.x + position.x - start.x;
-                                    state.overlay_bounds.y =
-                                        state.widget_pos.y + position.y - start.y;
+                                    state.overlay_bounds.x = state.widget_pos.x
+                                        + position.x
+                                        - start.x;
+                                    state.overlay_bounds.y = state.widget_pos.y
+                                        + position.y
+                                        - start.y;
                                 }
 
                                 // Send on_drag message
                                 if let Some(on_drag) = self.on_drag.as_deref() {
-                                    let message = (on_drag)(position, state.overlay_bounds);
+                                    let message = (on_drag)(
+                                        position,
+                                        state.overlay_bounds,
+                                    );
                                     shell.publish(message);
                                 }
 
                                 shell.request_redraw();
                             }
                         }
-                    },
+                    }
                     mouse::Event::ButtonReleased(mouse::Button::Left) => {
                         match state.action {
                             Action::Select(_) => {
