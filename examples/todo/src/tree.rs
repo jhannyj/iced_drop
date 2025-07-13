@@ -127,7 +127,7 @@ impl TreeData {
         std::mem::swap(&mut s1.list, &mut s2.list);
     }
 
-    /// Returns the widget Id of all the widgets wich a item can be dropped on
+    /// Returns the widget Id of all the widgets which a item can be dropped on
     pub fn todo_options(&self, t_loc: &TreeLocation) -> Vec<Id> {
         let todo_id = if let Some(todo) = self.todo(t_loc) {
             todo.id.clone()
