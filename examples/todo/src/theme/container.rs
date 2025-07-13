@@ -1,5 +1,5 @@
 use iced::widget::container::Style;
-use iced::{color, Border, Theme};
+use iced::{Border, Theme, color};
 
 pub fn active_slot(_theme: &Theme) -> Style {
     Style {

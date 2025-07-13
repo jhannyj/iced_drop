@@ -1,5 +1,5 @@
 use iced::widget::text::Style;
-use iced::{color, Theme};
+use iced::{Theme, color};
 
 pub fn title(_theme: &Theme) -> Style {
     Style {

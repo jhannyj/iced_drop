@@ -2,7 +2,7 @@ pub mod widget;
 
 use iced::advanced::graphics::futures::MaybeSend;
 use iced::advanced::renderer;
-use iced::advanced::widget::{operate, Id};
+use iced::advanced::widget::{Id, operate};
 use iced::task::Task;
 use iced::{Element, Point, Rectangle};
 use widget::droppable::*;

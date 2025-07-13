@@ -1,9 +1,13 @@
 use iced::{
-    advanced::widget::{operate, Id, Operation},
     Rectangle, Task,
+    advanced::widget::{Id, Operation, operate},
 };
 
-pub fn swap_modify_states<Message, State, Modify>(t1: Id, t2: Id, modify: Modify) -> Task<Message>
+pub fn swap_modify_states<Message, State, Modify>(
+    t1: Id,
+    t2: Id,
+    modify: Modify,
+) -> Task<Message>
 where
     Message: Send + 'static,
     State: Clone + Send + 'static,
@@ -50,7 +54,12 @@ where
             operate_on_children(self);
         }
 
-        fn custom(&mut self, id: Option<&Id>, _bounds: Rectangle, state: &mut dyn std::any::Any) {
+        fn custom(
+            &mut self,
+            id: Option<&Id>,
+            _bounds: Rectangle,
+            state: &mut dyn std::any::Any,
+        ) {
             if self.t1_state.is_some() && self.t2_state.is_some() {
                 return;
             }
@@ -72,15 +81,17 @@ where
             if self.t1_state.is_none() || self.t2_state.is_none() {
                 iced::advanced::widget::operation::Outcome::None
             } else {
-                iced::advanced::widget::operation::Outcome::Chain(Box::new(SwapModify {
-                    t1: self.t1.clone(),
-                    t2: self.t2.clone(),
-                    modify: self.modify.clone(),
-                    t1_state: self.t1_state.clone().unwrap(),
-                    t2_state: self.t2_state.clone().unwrap(),
-                    swapped_t1: false,
-                    swapped_t2: false,
-                }))
+                iced::advanced::widget::operation::Outcome::Chain(Box::new(
+                    SwapModify {
+                        t1: self.t1.clone(),
+                        t2: self.t2.clone(),
+                        modify: self.modify.clone(),
+                        t1_state: self.t1_state.clone().unwrap(),
+                        t2_state: self.t2_state.clone().unwrap(),
+                        swapped_t1: false,
+                        swapped_t2: false,
+                    },
+                ))
             }
         }
     }
@@ -116,7 +127,12 @@ where
             operate_on_children(self);
         }
 
-        fn custom(&mut self, id: Option<&Id>, _bounds: Rectangle, state: &mut dyn std::any::Any) {
+        fn custom(
+            &mut self,
+            id: Option<&Id>,
+            _bounds: Rectangle,
+            state: &mut dyn std::any::Any,
+        ) {
             if self.swapped_t1 && self.swapped_t2 {
                 return;
             }

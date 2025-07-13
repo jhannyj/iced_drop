@@ -1,9 +1,9 @@
-use iced::widget::container::Id as CId;
 use iced::Border;
+use iced::widget::container::Id as CId;
 use iced::{
+    Element, Fill, Length, Point, Rectangle, Task,
     advanced::widget::Id,
     widget::{column, container, row, text},
-    Element, Fill, Length, Point, Rectangle, Task,
 };
 use iced_drop::droppable;
 
@@ -96,10 +96,11 @@ impl ColorDropper {
             .on_drop(move |point, rect| Message::DropColor(color, point, rect))
             .into()
         });
-        let colors_holder = container(column(colors).spacing(20.0).padding(20.0))
-            .center(Fill)
-            .height(Length::Fill)
-            .width(Length::Fixed(COLORS_CONTAINER_WIDTH));
+        let colors_holder =
+            container(column(colors).spacing(20.0).padding(20.0))
+                .center(Fill)
+                .height(Length::Fill)
+                .width(Length::Fixed(COLORS_CONTAINER_WIDTH));
         column![
             header,
             row![
@@ -212,7 +213,9 @@ impl DColor {
             DColor::Blue => "Blue is the color of the sky and sea",
             DColor::Yellow => "Yellow is the color of sunshine and happiness",
             DColor::Purple => "Purple is the color of royalty and luxury",
-            DColor::Orange => "Orange is the color of creativity and determination",
+            DColor::Orange => {
+                "Orange is the color of creativity and determination"
+            }
             DColor::Black => "Black is the color of power and elegance",
             DColor::White => "White is the color of purity and innocence",
             DColor::Gray => "Gray is the color of compromise and control",

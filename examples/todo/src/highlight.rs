@@ -17,7 +17,11 @@ pub trait Highlightable {
 }
 
 /// Set the droppable to be highlighted
-pub fn dragged(info: &Highlight, loc: TreeLocation, bounds: Rectangle) -> Highlight {
+pub fn dragged(
+    info: &Highlight,
+    loc: TreeLocation,
+    bounds: Rectangle,
+) -> Highlight {
     Highlight {
         dragging: Some((loc, bounds)),
         ..info.clone()
@@ -25,7 +29,10 @@ pub fn dragged(info: &Highlight, loc: TreeLocation, bounds: Rectangle) -> Highli
 }
 
 /// Determine if the current zone should be de-highlighted and if there is a new zone to be highlighted
-pub fn zones_found(info: &Highlight, zones: &Vec<(TreeLocation, Rectangle)>) -> Highlight {
+pub fn zones_found(
+    info: &Highlight,
+    zones: &Vec<(TreeLocation, Rectangle)>,
+) -> Highlight {
     let mut new_info = info.clone();
 
     if zones.is_empty() {
@@ -33,7 +40,8 @@ pub fn zones_found(info: &Highlight, zones: &Vec<(TreeLocation, Rectangle)>) -> 
     }
 
     if let Some((_, bounds)) = info.dragging {
-        let mut split_zones: [Vec<(TreeLocation, Rectangle)>; 2] = [vec![], vec![]];
+        let mut split_zones: [Vec<(TreeLocation, Rectangle)>; 2] =
+            [vec![], vec![]];
         for zone in zones {
             let is_task = match zone.0.element() {
                 TreeElement::Todo(_) => true,
@@ -102,7 +110,9 @@ pub fn zone_update(old_info: &Highlight, new_info: &Highlight) -> ZoneUpdate {
 pub fn set_hovered(tree: &mut TreeData, info: &Highlight, highlight: bool) {
     if let Some(loc) = info.hovered.as_ref() {
         match loc.element() {
-            &TreeElement::Slot => tree.slot_mut(loc.slot()).set_highlight(highlight),
+            &TreeElement::Slot => {
+                tree.slot_mut(loc.slot()).set_highlight(highlight)
+            }
             &TreeElement::List => tree.list_mut(&loc).set_highlight(highlight),
             &TreeElement::Todo(_) => {
                 if let Some(task) = tree.todo_mut(&loc) {
@@ -122,7 +132,12 @@ pub enum ZoneUpdate {
 }
 
 impl ZoneUpdate {
-    pub fn update(&self, tree: &mut TreeData, old_info: &Highlight, new_info: &Highlight) {
+    pub fn update(
+        &self,
+        tree: &mut TreeData,
+        old_info: &Highlight,
+        new_info: &Highlight,
+    ) {
         match self {
             ZoneUpdate::RemoveHighlight => set_hovered(tree, old_info, false),
             ZoneUpdate::Highlight => set_hovered(tree, new_info, true),

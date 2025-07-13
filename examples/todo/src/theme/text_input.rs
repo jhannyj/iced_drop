@@ -1,5 +1,5 @@
 use iced::widget::text_input::{Status, Style};
-use iced::{color, Border, Color, Theme};
+use iced::{Border, Color, Theme, color};
 
 pub fn element_adder(_theme: &Theme, _status: Status) -> Style {
     Style {
