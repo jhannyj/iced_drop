@@ -177,25 +177,28 @@ where
         shell: &mut iced::advanced::Shell<'_, Message>,
         _viewport: &iced::Rectangle,
     ) {
-        // handle the on event of the content first, in case that the droppable is nested
-        self.content.as_widget_mut().update(
-            &mut tree.children[0],
-            event,
-            layout,
-            cursor,
-            _renderer,
-            _clipboard,
-            shell,
-            _viewport,
-        );
-        // this should really only be captured if the droppable is nested or it contains some other
-        // widget that captures the event
-        if shell.is_event_captured() {
-            return;
+        let state = tree.state.downcast_mut::<State>();
+
+        if !matches!(state.action, Action::Drag(_, _)) {
+            // handle the on event of the content first, in case that the droppable is nested
+            self.content.as_widget_mut().update(
+                &mut tree.children[0],
+                event,
+                layout,
+                cursor,
+                _renderer,
+                _clipboard,
+                shell,
+                _viewport,
+            );
+            // this should really only be captured if the droppable is nested or it contains some other
+            // widget that captures the event
+            if shell.is_event_captured() {
+                return;
+            }
         }
 
         if let Some(on_drop) = self.on_drop.as_deref() {
-            let state = tree.state.downcast_mut::<State>();
             if let iced::Event::Mouse(mouse) = event {
                 match mouse {
                     mouse::Event::ButtonPressed(btn) => {
@@ -300,8 +303,6 @@ where
             if self.on_drop.is_none() {
                 Status::Disabled
             } else {
-                let state = tree.state.downcast_ref::<State>();
-
                 if let Action::Drag(_, _) = state.action {
                     Status::Dragged
                 } else {
@@ -448,6 +449,12 @@ where
         _viewport: &iced::Rectangle,
         _renderer: &Renderer,
     ) -> iced::advanced::mouse::Interaction {
+        let state = tree.state.downcast_ref::<State>();
+
+        if let Action::Drag(_, _) = state.action {
+            return mouse::Interaction::Grabbing;
+        }
+
         let child_interact = self.content.as_widget().mouse_interaction(
             &tree.children[0],
             layout,
@@ -460,13 +467,9 @@ where
             return child_interact;
         }
 
-        let state = tree.state.downcast_ref::<State>();
-
         if cursor.is_over(layout.bounds()) {
             if self.on_drop.is_none() {
                 mouse::Interaction::NotAllowed
-            } else if let Action::Drag(_, _) = state.action {
-                mouse::Interaction::Grabbing
             } else {
                 mouse::Interaction::Pointer
             }
