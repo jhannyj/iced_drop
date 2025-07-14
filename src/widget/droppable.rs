@@ -517,10 +517,14 @@ where
         }
 
         if cursor.is_over(layout.bounds()) {
-            if self.on_drop.is_none() {
-                mouse::Interaction::NotAllowed
+            if self.on_drop.is_some() {
+                if self.on_press.is_some() {
+                    mouse::Interaction::Pointer
+                } else {
+                    mouse::Interaction::Grab
+                }
             } else {
-                mouse::Interaction::Pointer
+                mouse::Interaction::NotAllowed
             }
         } else {
             mouse::Interaction::default()
