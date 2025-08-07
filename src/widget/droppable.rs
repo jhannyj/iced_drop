@@ -240,12 +240,14 @@ where
                             shell.capture_event();
                         } else if *btn == mouse::Button::Right {
                             if let Action::Drag(_, _) = state.action {
-                                shell.invalidate_layout();
                                 state.action = Action::None;
                                 if let Some(on_cancel) = self.on_cancel.clone()
                                 {
                                     shell.publish(on_cancel);
                                 }
+
+                                shell.invalidate_layout();
+                                shell.request_redraw();
                             }
                         }
                     }
@@ -348,15 +350,13 @@ where
             }
         }
 
-        let current_status = if cursor.is_over(layout.bounds()) {
-            if self.on_drop.is_none() {
-                Status::Disabled
+        let current_status = if self.on_drop.is_none() {
+            Status::Disabled
+        } else if cursor.is_over(layout.bounds()) {
+            if let Action::Drag(_, _) = state.action {
+                Status::Dragged
             } else {
-                if let Action::Drag(_, _) = state.action {
-                    Status::Dragged
-                } else {
-                    Status::Hovered
-                }
+                Status::Hovered
             }
         } else {
             Status::Active
