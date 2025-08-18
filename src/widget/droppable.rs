@@ -615,7 +615,7 @@ where
             inherited_style,
             layout,
             cursor_position,
-            &Rectangle::with_size(Size::INFINITY),
+            &Rectangle::with_size(Size::INFINITE),
         );
     }
 }
