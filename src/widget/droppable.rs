@@ -179,8 +179,8 @@ where
         vec![advanced::widget::Tree::new(&self.content)]
     }
 
-    fn diff(&self, tree: &mut iced::advanced::widget::Tree) {
-        tree.diff_children(std::slice::from_ref(&self.content))
+    fn diff(&mut self, tree: &mut iced::advanced::widget::Tree) {
+        tree.diff_children(std::slice::from_mut(&mut self.content))
     }
 
     fn size(&self) -> iced::Size<iced::Length> {
@@ -372,13 +372,13 @@ where
     }
 
     fn layout(
-        &self,
+        &mut self,
         tree: &mut iced::advanced::widget::Tree,
         renderer: &Renderer,
         limits: &iced::advanced::layout::Limits,
     ) -> iced::advanced::layout::Node {
         let state: &mut State = tree.state.downcast_mut::<State>();
-        let content_node = self.content.as_widget().layout(
+        let content_node = self.content.as_widget_mut().layout(
             &mut tree.children[0],
             renderer,
             limits,
@@ -413,7 +413,7 @@ where
     }
 
     fn operate(
-        &self,
+        &mut self,
         tree: &mut Tree,
         layout: Layout<'_>,
         renderer: &Renderer,
@@ -425,7 +425,7 @@ where
             self.id.as_ref(),
             layout.bounds(),
             &mut |operation| {
-                self.content.as_widget().operate(
+                self.content.as_widget_mut().operate(
                     &mut tree.children[0],
                     layout,
                     renderer,
@@ -475,7 +475,7 @@ where
         if self.drag_overlay {
             if let Action::Drag(_, _) = state.action {
                 return Some(overlay::Element::new(Box::new(Overlay {
-                    content: &self.content,
+                    content: &mut self.content,
                     tree: &mut tree.children[0],
                     overlay_bounds: state.overlay_bounds,
                 })));
@@ -578,7 +578,7 @@ struct Overlay<'a, 'b, Message, Theme, Renderer>
 where
     Renderer: renderer::Renderer,
 {
-    content: &'b Element<'a, Message, Theme, Renderer>,
+    content: &'b mut Element<'a, Message, Theme, Renderer>,
     tree: &'b mut advanced::widget::Tree,
     overlay_bounds: Rectangle,
 }
@@ -591,7 +591,7 @@ where
 {
     fn layout(&mut self, renderer: &Renderer, _bounds: Size) -> layout::Node {
         Widget::<Message, Theme, Renderer>::layout(
-            self.content.as_widget(),
+            self.content.as_widget_mut(),
             self.tree,
             renderer,
             &layout::Limits::new(Size::ZERO, self.overlay_bounds.size()),
@@ -615,7 +615,7 @@ where
             inherited_style,
             layout,
             cursor_position,
-            &Rectangle::with_size(Size::INFINITY),
+            &Rectangle::with_size(Size::INFINITE),
         );
     }
 }
