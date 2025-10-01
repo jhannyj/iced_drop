@@ -179,8 +179,8 @@ where
         vec![advanced::widget::Tree::new(&self.content)]
     }
 
-    fn diff(&mut self, tree: &mut iced::advanced::widget::Tree) {
-        tree.diff_children(std::slice::from_mut(&mut self.content))
+    fn diff(&self, tree: &mut iced::advanced::widget::Tree) {
+        tree.diff_children(std::slice::from_ref(&self.content))
     }
 
     fn size(&self) -> iced::Size<iced::Length> {
@@ -219,134 +219,118 @@ where
             }
         }
 
-        if let Some(on_drop) = self.on_drop.as_deref() {
-            if let iced::Event::Mouse(mouse) = event {
-                match mouse {
-                    mouse::Event::ButtonPressed(btn) => {
-                        if *btn == mouse::Button::Left
-                            && cursor.is_over(layout.bounds())
-                        {
-                            // select the droppable and store the position of the widget before dragging
-                            state.action =
-                                Action::Select(cursor.position().unwrap());
-                            let bounds = layout.bounds();
-                            state.widget_pos = bounds.position();
-                            state.overlay_bounds.width = bounds.width;
-                            state.overlay_bounds.height = bounds.height;
+        if let Some(on_drop) = self.on_drop.as_deref()
+            && let iced::Event::Mouse(mouse) = event
+        {
+            match mouse {
+                mouse::Event::ButtonPressed(btn) => {
+                    if *btn == mouse::Button::Left
+                        && cursor.is_over(layout.bounds())
+                    {
+                        // select the droppable and store the position of the widget before dragging
+                        state.action =
+                            Action::Select(cursor.position().unwrap());
+                        let bounds = layout.bounds();
+                        state.widget_pos = bounds.position();
+                        state.overlay_bounds.width = bounds.width;
+                        state.overlay_bounds.height = bounds.height;
 
-                            if let Some(on_click) = self.on_click.clone() {
-                                shell.publish(on_click);
-                            }
-                            shell.capture_event();
-                        } else if *btn == mouse::Button::Right {
-                            if let Action::Drag(_, _) = state.action {
-                                state.action = Action::None;
-                                if let Some(on_cancel) = self.on_cancel.clone()
-                                {
-                                    shell.publish(on_cancel);
-                                }
-
-                                shell.invalidate_layout();
-                                shell.request_redraw();
-                            }
+                        if let Some(on_click) = self.on_click.clone() {
+                            shell.publish(on_click);
                         }
-                    }
-                    &mouse::Event::CursorMoved { mut position } => {
-                        let should_drag = match state.action {
-                            Action::Select(start) => {
-                                // Check if cursor has moved from the initial click position
-                                // (in case there was a micro-movement, might happen on trackpad)
-                                let distance = ((position.x - start.x).powi(2)
-                                    + (position.y - start.y).powi(2))
-                                .sqrt();
+                        shell.capture_event();
+                    } else if *btn == mouse::Button::Right
+                        && let Action::Drag(_, _) = state.action
+                    {
+                        state.action = Action::None;
+                        if let Some(on_cancel) = self.on_cancel.clone() {
+                            shell.publish(on_cancel);
+                        }
 
-                                if distance >= self.drag_threshold {
-                                    state.action =
-                                        Action::Drag(start, position);
-                                    true
-                                } else {
-                                    false
-                                }
-                            }
-                            Action::Drag(start, _) => {
+                        shell.invalidate_layout();
+                        shell.request_redraw();
+                    }
+                }
+                &mouse::Event::CursorMoved { mut position } => {
+                    let should_drag = match state.action {
+                        Action::Select(start) => {
+                            // Check if cursor has moved from the initial click position
+                            // (in case there was a micro-movement, might happen on trackpad)
+                            let distance = ((position.x - start.x).powi(2)
+                                + (position.y - start.y).powi(2))
+                            .sqrt();
+
+                            if distance >= self.drag_threshold {
                                 state.action = Action::Drag(start, position);
                                 true
-                            }
-                            _ => false,
-                        };
-
-                        if should_drag {
-                            if let Action::Drag(start, _) = state.action {
-                                // Apply drag mode constraints
-                                if let Some((drag_x, drag_y)) = self.drag_mode {
-                                    position = Point {
-                                        x: if drag_x {
-                                            position.x
-                                        } else {
-                                            start.x
-                                        },
-                                        y: if drag_y {
-                                            position.y
-                                        } else {
-                                            start.y
-                                        },
-                                    };
-                                }
-
-                                // update the position of the overlay since the cursor was moved
-                                if self.drag_center {
-                                    state.overlay_bounds.x = position.x
-                                        - state.overlay_bounds.width / 2.0;
-                                    state.overlay_bounds.y = position.y
-                                        - state.overlay_bounds.height / 2.0;
-                                } else {
-                                    state.overlay_bounds.x = state.widget_pos.x
-                                        + position.x
-                                        - start.x;
-                                    state.overlay_bounds.y = state.widget_pos.y
-                                        + position.y
-                                        - start.y;
-                                }
-
-                                // Send on_drag message
-                                if let Some(on_drag) = self.on_drag.as_deref() {
-                                    let message = (on_drag)(
-                                        position,
-                                        state.overlay_bounds,
-                                    );
-                                    shell.publish(message);
-                                }
-
-                                shell.request_redraw();
+                            } else {
+                                false
                             }
                         }
-                    }
-                    mouse::Event::ButtonReleased(mouse::Button::Left) => {
-                        match state.action {
-                            Action::Select(_) => {
-                                if let Some(on_press) = self.on_press.clone() {
-                                    shell.publish(on_press);
-                                }
-                                state.action = Action::None;
-                            }
-                            Action::Drag(_, current) => {
-                                // send on drop msg
-                                let message =
-                                    (on_drop)(current, state.overlay_bounds);
-                                shell.publish(message);
-
-                                if self.reset_delay == 0 {
-                                    state.action = Action::None;
-                                } else {
-                                    state.action =
-                                        Action::Wait(self.reset_delay);
-                                }
-                            }
-                            _ => (),
+                        Action::Drag(start, _) => {
+                            state.action = Action::Drag(start, position);
+                            true
                         }
+                        _ => false,
+                    };
+
+                    if should_drag && let Action::Drag(start, _) = state.action
+                    {
+                        // Apply drag mode constraints
+                        if let Some((drag_x, drag_y)) = self.drag_mode {
+                            position = Point {
+                                x: if drag_x { position.x } else { start.x },
+                                y: if drag_y { position.y } else { start.y },
+                            };
+                        }
+
+                        // update the position of the overlay since the cursor was moved
+                        if self.drag_center {
+                            state.overlay_bounds.x =
+                                position.x - state.overlay_bounds.width / 2.0;
+                            state.overlay_bounds.y =
+                                position.y - state.overlay_bounds.height / 2.0;
+                        } else {
+                            state.overlay_bounds.x =
+                                state.widget_pos.x + position.x - start.x;
+                            state.overlay_bounds.y =
+                                state.widget_pos.y + position.y - start.y;
+                        }
+
+                        // Send on_drag message
+                        if let Some(on_drag) = self.on_drag.as_deref() {
+                            let message =
+                                (on_drag)(position, state.overlay_bounds);
+                            shell.publish(message);
+                        }
+
+                        shell.request_redraw();
                     }
-                    _ => {}
                 }
+                mouse::Event::ButtonReleased(mouse::Button::Left) => {
+                    match state.action {
+                        Action::Select(_) => {
+                            if let Some(on_press) = self.on_press.clone() {
+                                shell.publish(on_press);
+                            }
+                            state.action = Action::None;
+                        }
+                        Action::Drag(_, current) => {
+                            // send on drop msg
+                            let message =
+                                (on_drop)(current, state.overlay_bounds);
+                            shell.publish(message);
+
+                            if self.reset_delay == 0 {
+                                state.action = Action::None;
+                            } else {
+                                state.action = Action::Wait(self.reset_delay);
+                            }
+                        }
+                        _ => (),
+                    }
+                }
+                _ => {}
             }
         }
 
@@ -421,18 +405,15 @@ where
     ) {
         let state = tree.state.downcast_mut::<State>();
         operation.custom(self.id.as_ref(), layout.bounds(), state);
-        operation.container(
-            self.id.as_ref(),
-            layout.bounds(),
-            &mut |operation| {
-                self.content.as_widget_mut().operate(
-                    &mut tree.children[0],
-                    layout,
-                    renderer,
-                    operation,
-                );
-            },
-        );
+        operation.container(self.id.as_ref(), layout.bounds());
+        operation.traverse(&mut |operation| {
+            self.content.as_widget_mut().operate(
+                &mut tree.children[0],
+                layout,
+                renderer,
+                operation,
+            );
+        });
     }
 
     fn draw(
@@ -446,10 +427,10 @@ where
         viewport: &iced::Rectangle,
     ) {
         let state: &State = tree.state.downcast_ref::<State>();
-        if let Action::Drag(_, _) = state.action {
-            if self.drag_hide {
-                return;
-            }
+        if let Action::Drag(_, _) = state.action
+            && self.drag_hide
+        {
+            return;
         }
 
         self.content.as_widget().draw(
@@ -459,7 +440,7 @@ where
             style,
             layout,
             cursor,
-            &viewport,
+            viewport,
         );
     }
 
@@ -472,14 +453,14 @@ where
         _translation: Vector,
     ) -> Option<overlay::Element<'b, Message, Theme, Renderer>> {
         let state: &mut State = tree.state.downcast_mut::<State>();
-        if self.drag_overlay {
-            if let Action::Drag(_, _) = state.action {
-                return Some(overlay::Element::new(Box::new(Overlay {
-                    content: &mut self.content,
-                    tree: &mut tree.children[0],
-                    overlay_bounds: state.overlay_bounds,
-                })));
-            }
+        if self.drag_overlay
+            && let Action::Drag(_, _) = state.action
+        {
+            return Some(overlay::Element::new(Box::new(Overlay {
+                content: &mut self.content,
+                tree: &mut tree.children[0],
+                overlay_bounds: state.overlay_bounds,
+            })));
         }
         self.content.as_widget_mut().overlay(
             &mut tree.children[0],

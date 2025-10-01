@@ -33,7 +33,7 @@ where
         options,
         depth,
     ))
-    .map(move |id| msg(id))
+    .map(msg)
 }
 
 pub fn find_zones<Message, MF, F>(
@@ -51,5 +51,5 @@ where
         + 'static,
     F: Fn(&Rectangle) -> bool + Send + 'static,
 {
-    operate(drop::find_zones(filter, options, depth)).map(move |id| msg(id))
+    operate(drop::find_zones(filter, options, depth)).map(msg)
 }
