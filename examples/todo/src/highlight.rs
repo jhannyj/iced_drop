@@ -43,15 +43,12 @@ pub fn zones_found(
         let mut split_zones: [Vec<(TreeLocation, Rectangle)>; 2] =
             [vec![], vec![]];
         for zone in zones {
-            let is_task = match zone.0.element() {
-                TreeElement::Todo(_) => true,
-                _ => false,
-            };
+            let is_task = matches!(zone.0.element(), TreeElement::Todo(_));
 
             if is_task {
-                split_zones[0].push(zone.clone());
+                split_zones[0].push(*zone);
             } else {
-                split_zones[1].push(zone.clone());
+                split_zones[1].push(*zone);
             }
         }
         let valid_zones = if split_zones[0].is_empty() {
@@ -60,7 +57,7 @@ pub fn zones_found(
             &split_zones[0]
         };
         if let Some((id, _)) = bigggest_intersect_area(valid_zones, &bounds) {
-            new_info.hovered = Some(id.clone());
+            new_info.hovered = Some(*id);
         }
     }
     new_info
@@ -78,13 +75,7 @@ pub fn should_update_droppable(
 ) -> bool {
     match &old_info.dragging {
         Some((d_id, _)) => *d_id == *loc,
-        None => {
-            if new_info.dragging.is_some() {
-                true
-            } else {
-                false
-            }
-        }
+        None => new_info.dragging.is_some(),
     }
 }
 
@@ -109,13 +100,13 @@ pub fn zone_update(old_info: &Highlight, new_info: &Highlight) -> ZoneUpdate {
 
 pub fn set_hovered(tree: &mut TreeData, info: &Highlight, highlight: bool) {
     if let Some(loc) = info.hovered.as_ref() {
-        match loc.element() {
-            &TreeElement::Slot => {
+        match *loc.element() {
+            TreeElement::Slot => {
                 tree.slot_mut(loc.slot()).set_highlight(highlight)
             }
-            &TreeElement::List => tree.list_mut(&loc).set_highlight(highlight),
-            &TreeElement::Todo(_) => {
-                if let Some(task) = tree.todo_mut(&loc) {
+            TreeElement::List => tree.list_mut(loc).set_highlight(highlight),
+            TreeElement::Todo(_) => {
+                if let Some(task) = tree.todo_mut(loc) {
                     task.set_highlight(highlight);
                 }
             }
@@ -152,7 +143,7 @@ impl ZoneUpdate {
 
 /// Returns the id and area of the zone with the biggest intersection with the droppable rectangle
 fn bigggest_intersect_area<'a>(
-    zones: &'a Vec<(TreeLocation, Rectangle)>,
+    zones: &'a [(TreeLocation, Rectangle)],
     droppable: &Rectangle,
 ) -> Option<(&'a TreeLocation, f32)> {
     zones
@@ -160,8 +151,7 @@ fn bigggest_intersect_area<'a>(
         .map(|(id, rect)| {
             (
                 id,
-                rect.intersection(&droppable)
-                    .unwrap_or(Rectangle::default()),
+                rect.intersection(droppable).unwrap_or(Rectangle::default()),
             )
         })
         .map(|(id, rect)| (id, rect.area()))
