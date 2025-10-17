@@ -1,5 +1,4 @@
 use iced::Border;
-use iced::widget::container::Id as CId;
 use iced::{
     Element, Fill, Length, Point, Rectangle, Task,
     advanced::widget::Id,
@@ -32,8 +31,8 @@ enum Message {
 struct ColorDropper {
     left_color: DColor,
     right_color: DColor,
-    left: iced::widget::container::Id,
-    right: iced::widget::container::Id,
+    left: Id,
+    right: Id,
 }
 
 impl Default for ColorDropper {
@@ -41,8 +40,8 @@ impl Default for ColorDropper {
         Self {
             left_color: DColor::Default,
             right_color: DColor::Default,
-            left: CId::new("left"),
-            right: CId::new("right"),
+            left: Id::new("left"),
+            right: Id::new("right"),
         }
     }
 }
@@ -67,8 +66,8 @@ impl ColorDropper {
                 );
             }
             Message::HandleZonesFound(color, zones) => {
-                if let Some((zone, _)) = zones.get(0) {
-                    if *zone == self.left.clone().into() {
+                if let Some((zone, _)) = zones.first() {
+                    if *zone == self.left.clone() {
                         self.left_color = color;
                     } else {
                         self.right_color = color;
@@ -117,7 +116,7 @@ impl ColorDropper {
 
 fn drop_zone<'a>(
     color: DColor,
-    id: iced::widget::container::Id,
+    id: Id,
 ) -> iced::Element<'a, Message, iced::Theme, iced::Renderer> {
     container(text(color.fun_fact()).size(20))
         .style(move |_| color.style())
