@@ -69,7 +69,7 @@ where
             _state: &mut dyn Scrollable,
         ) {
             if (self.filter)(&bounds) {
-                self.offset = self.offset + translation;
+                self.offset += translation;
             }
         }
     }
