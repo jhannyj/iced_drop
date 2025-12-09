@@ -2,6 +2,7 @@
 name = "iced_drop"
 version = "0.1.0"
 edition = "2024"
+rust-versio = "1.88"
 
 [dependencies]
 iced.workspace = true
