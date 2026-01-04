@@ -5,4 +5,5 @@ edition = "2024"
 
 [dependencies]
 iced.workspace = true
+iced.default-features = true
 iced_drop = { path = "../.." }
