@@ -1,10 +1,6 @@
-use iced::{
-    advanced::widget::{
-        operation::{Outcome, Scrollable},
-        Id, Operation,
-    },
-    Rectangle, Vector,
-};
+use iced::advanced::widget::operation::{Outcome, Scrollable};
+use iced::advanced::widget::{Id, Operation};
+use iced::{Rectangle, Vector};
 
 /// Produces an [`Operation`] that will find the drop zones that pass a filter on the zone's bounds.
 /// For any drop zone to be considered, the Element must have some Id.
@@ -26,38 +22,37 @@ where
         max_depth: Option<usize>,
         c_depth: usize,
         offset: Vector,
+        goto_next: bool,
     }
 
     impl<F> Operation<Vec<(Id, Rectangle)>> for FindDropZone<F>
     where
         F: Fn(&Rectangle) -> bool + Send + 'static,
     {
-        fn container(
-            &mut self,
-            id: Option<&Id>,
-            bounds: iced::Rectangle,
-            operate_on_children: &mut dyn FnMut(&mut dyn Operation<Vec<(Id, Rectangle)>>),
-        ) {
-            match id {
-                Some(id) => {
-                    let is_option = match &self.options {
-                        Some(options) => options.contains(id),
-                        None => true,
-                    };
-                    let bounds = bounds - self.offset;
-                    if is_option && (self.filter)(&bounds) {
-                        self.c_depth += 1;
-                        self.zones.push((id.clone(), bounds));
-                    }
+        fn container(&mut self, id: Option<&Id>, bounds: iced::Rectangle) {
+            if let Some(id) = id {
+                let is_option = match &self.options {
+                    Some(options) => options.contains(id),
+                    None => true,
+                };
+                let bounds = bounds - self.offset;
+                if is_option && (self.filter)(&bounds) {
+                    self.c_depth += 1;
+                    self.zones.push((id.clone(), bounds));
                 }
-                None => (),
             }
-            let goto_next = match &self.max_depth {
+            self.goto_next = match &self.max_depth {
                 Some(m_depth) => self.c_depth < *m_depth,
                 None => true,
             };
-            if goto_next {
-                operate_on_children(self);
+        }
+
+        fn traverse(
+            &mut self,
+            operate: &mut dyn FnMut(&mut dyn Operation<Vec<(Id, Rectangle)>>),
+        ) {
+            if self.goto_next {
+                operate(self);
             }
         }
 
@@ -67,14 +62,14 @@ where
 
         fn scrollable(
             &mut self,
-            _state: &mut dyn Scrollable,
             _id: Option<&Id>,
             bounds: Rectangle,
             _content_bounds: Rectangle,
             translation: Vector,
+            _state: &mut dyn Scrollable,
         ) {
             if (self.filter)(&bounds) {
-                self.offset = self.offset + translation;
+                self.offset += translation;
             }
         }
     }
@@ -86,5 +81,6 @@ where
         max_depth: depth,
         c_depth: 0,
         offset: Vector { x: 0.0, y: 0.0 },
+        goto_next: false,
     }
 }

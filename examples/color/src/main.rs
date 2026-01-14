@@ -1,9 +1,8 @@
-use iced::widget::container::Id as CId;
 use iced::Border;
 use iced::{
+    Element, Fill, Length, Point, Rectangle, Task,
     advanced::widget::Id,
     widget::{column, container, row, text},
-    Element, Fill, Length, Point, Rectangle, Task,
 };
 use iced_drop::droppable;
 
@@ -14,10 +13,11 @@ const COLORS_CONTAINER_WIDTH: f32 = 130.0;
 
 fn main() -> iced::Result {
     iced::application(
-        ColorDropper::title,
+        ColorDropper::default,
         ColorDropper::update,
         ColorDropper::view,
     )
+    .title(ColorDropper::title)
     .theme(ColorDropper::theme)
     .run()
 }
@@ -31,8 +31,8 @@ enum Message {
 struct ColorDropper {
     left_color: DColor,
     right_color: DColor,
-    left: iced::widget::container::Id,
-    right: iced::widget::container::Id,
+    left: Id,
+    right: Id,
 }
 
 impl Default for ColorDropper {
@@ -40,8 +40,8 @@ impl Default for ColorDropper {
         Self {
             left_color: DColor::Default,
             right_color: DColor::Default,
-            left: CId::new("left"),
-            right: CId::new("right"),
+            left: Id::new("left"),
+            right: Id::new("right"),
         }
     }
 }
@@ -66,8 +66,8 @@ impl ColorDropper {
                 );
             }
             Message::HandleZonesFound(color, zones) => {
-                if let Some((zone, _)) = zones.get(0) {
-                    if *zone == self.left.clone().into() {
+                if let Some((zone, _)) = zones.first() {
+                    if *zone == self.left.clone() {
                         self.left_color = color;
                     } else {
                         self.right_color = color;
@@ -95,10 +95,11 @@ impl ColorDropper {
             .on_drop(move |point, rect| Message::DropColor(color, point, rect))
             .into()
         });
-        let colors_holder = container(column(colors).spacing(20.0).padding(20.0))
-            .center(Fill)
-            .height(Length::Fill)
-            .width(Length::Fixed(COLORS_CONTAINER_WIDTH));
+        let colors_holder =
+            container(column(colors).spacing(20.0).padding(20.0))
+                .center(Fill)
+                .height(Length::Fill)
+                .width(Length::Fixed(COLORS_CONTAINER_WIDTH));
         column![
             header,
             row![
@@ -115,7 +116,7 @@ impl ColorDropper {
 
 fn drop_zone<'a>(
     color: DColor,
-    id: iced::widget::container::Id,
+    id: Id,
 ) -> iced::Element<'a, Message, iced::Theme, iced::Renderer> {
     container(text(color.fun_fact()).size(20))
         .style(move |_| color.style())
@@ -211,7 +212,9 @@ impl DColor {
             DColor::Blue => "Blue is the color of the sky and sea",
             DColor::Yellow => "Yellow is the color of sunshine and happiness",
             DColor::Purple => "Purple is the color of royalty and luxury",
-            DColor::Orange => "Orange is the color of creativity and determination",
+            DColor::Orange => {
+                "Orange is the color of creativity and determination"
+            }
             DColor::Black => "Black is the color of power and elegance",
             DColor::White => "White is the color of purity and innocence",
             DColor::Gray => "Gray is the color of compromise and control",

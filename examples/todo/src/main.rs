@@ -1,13 +1,13 @@
-#![feature(get_many_mut)]
-#![feature(hash_raw_entry)]
-
 use std::time::Instant;
 
-use highlight::{should_update_droppable, zone_update, Highlight, Highlightable, ZoneUpdate};
+use highlight::{
+    Highlight, Highlightable, ZoneUpdate, should_update_droppable, zone_update,
+};
 use iced::{
-    advanced::widget::Id,
-    widget::{column, container, text, text_input},
     Element, Length, Point, Rectangle, Task,
+    advanced::widget::Id,
+    widget::operation::focus,
+    widget::{column, container, text},
 };
 use iced_drop::find_zones;
 use iced_drop::widget::droppable::State as DroppableState;
@@ -23,7 +23,8 @@ const HEADER_HEIGHT: f32 = 80.0;
 const DOUBLE_CLICK_TIME: u128 = 500;
 
 fn main() -> iced::Result {
-    iced::application(TodoBoard::title, TodoBoard::update, TodoBoard::view)
+    iced::application(TodoBoard::default, TodoBoard::update, TodoBoard::view)
+        .title(TodoBoard::title)
         .theme(TodoBoard::theme)
         .run()
 }
@@ -31,7 +32,7 @@ fn main() -> iced::Result {
 #[derive(Debug, Clone)]
 enum Message {
     // To-do editing
-    EditTodo(TreeLocation, iced::widget::text_input::Id),
+    EditTodo(TreeLocation, Id),
     UpdateTodo(TreeLocation, String),
     StopEditingTodo,
 
@@ -40,7 +41,7 @@ enum Message {
     WriteTodo(TreeLocation),
 
     // Drag/drop to-dos
-    DragTodo(TreeLocation, Point, Rectangle),
+    DragTodo(TreeLocation, Rectangle),
     HandleTodoZones(Vec<(Id, Rectangle)>),
     #[allow(dead_code)]
     DropTodo(TreeLocation, Point, Rectangle),
@@ -89,11 +90,12 @@ impl TodoBoard {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let header = container(text("TODO Board").size(30).style(theme::text::title))
-            .padding(10.0)
-            .width(Length::Fill)
-            .height(Length::Fixed(HEADER_HEIGHT))
-            .style(theme::container::title);
+        let header =
+            container(text("TODO Board").size(30).style(theme::text::title))
+                .padding(10.0)
+                .width(Length::Fill)
+                .height(Length::Fixed(HEADER_HEIGHT))
+                .style(theme::container::title);
         container(
             column![header, self.tree.view()]
                 .height(Length::Fill)
@@ -111,13 +113,13 @@ impl TodoBoard {
                 self.stop_editing();
 
                 let (clicked, time) = &self.clicked;
-                if *clicked == t_loc && time.elapsed().as_millis() < DOUBLE_CLICK_TIME {
-                    if let Some(todo) = self.tree.todo_mut(&t_loc) {
+                if *clicked == t_loc
+                    && time.elapsed().as_millis() < DOUBLE_CLICK_TIME
+                    && let Some(todo) = self.tree.todo_mut(&t_loc) {
                         todo.editing = true;
                         self.editing = Some(t_loc);
-                        return text_input::focus(ti_id);
+                        return focus(ti_id);
                     }
-                }
                 self.clicked = (t_loc, Instant::now());
             }
             Message::UpdateTodo(t_loc, content) => {
@@ -129,14 +131,20 @@ impl TodoBoard {
                 self.stop_editing();
             }
             // To-do drag/drop
-            Message::DragTodo(t_loc, __, t_bounds) => {
-                let new_highlight =
-                    highlight::dragged(&self.todos_highlight, t_loc.clone(), t_bounds);
-                if should_update_droppable(&self.todos_highlight, &new_highlight, &t_loc) {
-                    if let Some(todo) = self.tree.todo_mut(&t_loc) {
+            Message::DragTodo(t_loc, t_bounds) => {
+                let new_highlight = highlight::dragged(
+                    &self.todos_highlight,
+                    t_loc,
+                    t_bounds,
+                );
+                if should_update_droppable(
+                    &self.todos_highlight,
+                    &new_highlight,
+                    &t_loc,
+                )
+                    && let Some(todo) = self.tree.todo_mut(&t_loc) {
                         todo.set_highlight(true)
                     }
-                }
                 self.todos_highlight = new_highlight;
                 return find_zones(
                     Message::HandleTodoZones,
@@ -146,8 +154,10 @@ impl TodoBoard {
                 );
             }
             Message::HandleTodoZones(zones) => {
-                let new_highlight =
-                    highlight::zones_found(&self.todos_highlight, &map_zones(&self.tree, zones));
+                let new_highlight = highlight::zones_found(
+                    &self.todos_highlight,
+                    &map_zones(&self.tree, zones),
+                );
                 zone_update(&self.todos_highlight, &new_highlight).update(
                     &mut self.tree,
                     &self.todos_highlight,
@@ -158,9 +168,11 @@ impl TodoBoard {
             Message::DropTodo(t_loc, _, _) => {
                 if let Some(h_loc) = &self.todos_highlight.hovered {
                     match h_loc.element() {
-                        TreeElement::List => todo_dropped_on_list(&mut self.tree, &t_loc, &h_loc),
+                        TreeElement::List => {
+                            todo_dropped_on_list(&mut self.tree, &t_loc, h_loc)
+                        }
                         TreeElement::Todo(_) => {
-                            todo_dropped_on_todo(&mut self.tree, &t_loc, &h_loc)
+                            todo_dropped_on_todo(&mut self.tree, &t_loc, h_loc)
                         }
                         _ => (),
                     }
@@ -172,9 +184,16 @@ impl TodoBoard {
 
             // List drag/drop
             Message::DragList(l_loc, _, l_bounds) => {
-                let new_highlight =
-                    highlight::dragged(&self.lists_highlight, l_loc.clone(), l_bounds);
-                if should_update_droppable(&self.lists_highlight, &new_highlight, &l_loc) {
+                let new_highlight = highlight::dragged(
+                    &self.lists_highlight,
+                    l_loc,
+                    l_bounds,
+                );
+                if should_update_droppable(
+                    &self.lists_highlight,
+                    &new_highlight,
+                    &l_loc,
+                ) {
                     self.tree.list_mut(&l_loc).set_highlight(false);
                 }
                 self.lists_highlight = new_highlight;
@@ -186,19 +205,28 @@ impl TodoBoard {
                 );
             }
             Message::HandleListZones(zones) => {
-                let new_info =
-                    highlight::zones_found(&self.lists_highlight, &map_zones(&self.tree, zones));
-                let highlight_update = zone_update(&self.lists_highlight, &new_info);
-                highlight_update.update(&mut self.tree, &self.lists_highlight, &new_info);
+                let new_info = highlight::zones_found(
+                    &self.lists_highlight,
+                    &map_zones(&self.tree, zones),
+                );
+                let highlight_update =
+                    zone_update(&self.lists_highlight, &new_info);
+                highlight_update.update(
+                    &mut self.tree,
+                    &self.lists_highlight,
+                    &new_info,
+                );
                 self.lists_highlight = new_info;
 
-                if highlight_update == ZoneUpdate::Replace {
-                    if let Some(d_loc) = &self.lists_highlight.dragging {
-                        if let Some(h_loc) = &self.lists_highlight.hovered {
-                            return move_list_to_zone(&mut self.tree, &d_loc.0, &h_loc);
+                if highlight_update == ZoneUpdate::Replace
+                    && let Some(d_loc) = &self.lists_highlight.dragging
+                        && let Some(h_loc) = &self.lists_highlight.hovered {
+                            return move_list_to_zone(
+                                &mut self.tree,
+                                &d_loc.0,
+                                h_loc,
+                            );
                         }
-                    }
-                }
             }
             Message::DropList(l_loc, _, _) => {
                 self.tree.list_mut(&l_loc).set_highlight(false);
@@ -223,15 +251,18 @@ impl TodoBoard {
                 }
                 let todo = Todo::new(&text);
                 self.tree.list_mut(&l_loc).push(todo);
-                return text_input::focus(id);
+                return focus(id);
             }
             Message::TodoDropCanceled => {
-                if let Some(d_loc) = &self.todos_highlight.dragging {
-                    if let Some(todo) = self.tree.todo_mut(&d_loc.0) {
+                if let Some(d_loc) = &self.todos_highlight.dragging
+                    && let Some(todo) = self.tree.todo_mut(&d_loc.0) {
                         todo.set_highlight(false);
-                        highlight::set_hovered(&mut self.tree, &self.todos_highlight, false);
+                        highlight::set_hovered(
+                            &mut self.tree,
+                            &self.todos_highlight,
+                            false,
+                        );
                     }
-                }
                 self.todos_highlight = highlight::dropped();
             }
             Message::ListDropCanceled => {
@@ -248,29 +279,31 @@ impl TodoBoard {
 
 impl TodoBoard {
     fn stop_editing(&mut self) {
-        if let Some(loc) = self.editing {
-            if let Some(todo) = self.tree.todo_mut(&loc) {
+        if let Some(loc) = self.editing
+            && let Some(todo) = self.tree.todo_mut(&loc) {
                 todo.editing = false;
                 self.editing = None;
             }
-        }
     }
 }
 
-fn map_zones(tree: &TreeData, zones: Vec<(Id, Rectangle)>) -> Vec<(TreeLocation, Rectangle)> {
+fn map_zones(
+    tree: &TreeData,
+    zones: Vec<(Id, Rectangle)>,
+) -> Vec<(TreeLocation, Rectangle)> {
     zones
         .into_iter()
         .filter_map(|(id, rect)| {
-            if let Some(loc) = tree.find(&id) {
-                Some((loc, rect))
-            } else {
-                None
-            }
+            tree.find(&id).map(|loc| (loc, rect))
         })
         .collect()
 }
 
-fn todo_dropped_on_list(tree: &mut TreeData, d_loc: &TreeLocation, h_loc: &TreeLocation) {
+fn todo_dropped_on_list(
+    tree: &mut TreeData,
+    d_loc: &TreeLocation,
+    h_loc: &TreeLocation,
+) {
     if let Some(todo) = tree.todo_mut(d_loc) {
         todo.set_highlight(false);
         let todo = {
@@ -289,7 +322,11 @@ fn todo_dropped_on_list(tree: &mut TreeData, d_loc: &TreeLocation, h_loc: &TreeL
     }
 }
 
-fn todo_dropped_on_todo(tree: &mut TreeData, d_loc: &TreeLocation, h_loc: &TreeLocation) {
+fn todo_dropped_on_todo(
+    tree: &mut TreeData,
+    d_loc: &TreeLocation,
+    h_loc: &TreeLocation,
+) {
     if let Some(d_todo) = tree.todo_mut(d_loc) {
         d_todo.set_highlight(false);
         let h_todo = tree.todo_mut(h_loc);
@@ -318,7 +355,9 @@ fn move_list_to_zone(
     let l1 = tree.list_mut(d_loc).id();
     let l2 = tree.list_mut(h_loc).id();
     tree.swap_lists(d_loc, h_loc);
-    return swap_modify_states(l1, l2, |_old: &DroppableState, new: &DroppableState| {
-        new.clone()
-    });
+    swap_modify_states(
+        l1,
+        l2,
+        |_old: &DroppableState, new: &DroppableState| *new,
+    )
 }

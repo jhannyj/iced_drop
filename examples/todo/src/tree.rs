@@ -1,16 +1,14 @@
 use std::sync::atomic::AtomicUsize;
 
 use iced::advanced::widget::Id;
-
 use iced::widget::tooltip;
 use iced::{
-    alignment,
-    widget::{button, column, container, horizontal_space, row, text, text_input},
-    Center, Element, Length, Size,
+    Center, Element, Length, Size, alignment,
+    widget::{button, column, container, row, space, text, text_input},
 };
 use iced_drop::droppable;
 
-use crate::{highlight::Highlightable, theme, Message};
+use crate::{Message, highlight::Highlightable, theme};
 
 pub const NULL_TODO_LOC: TreeLocation = TreeLocation {
     slot: 0,
@@ -46,7 +44,7 @@ pub enum TreeElement {
 
 pub struct ElementAdder {
     pub text: String,
-    id: iced::widget::text_input::Id,
+    id: Id,
 }
 
 /// Contains items organized by slots, and lists
@@ -59,8 +57,9 @@ impl TreeData {
         Self { slots }
     }
     /// Convert the tree into an element that iced can render
-    pub fn view(&self) -> Element<Message> {
-        let children = self.slots.iter().enumerate().map(|(i, slot)| slot.view(i));
+    pub fn view(&self) -> Element<'_, Message> {
+        let children =
+            self.slots.iter().enumerate().map(|(i, slot)| slot.view(i));
         row(children)
             .spacing(10.0)
             .padding(20.0)
@@ -118,15 +117,15 @@ impl TreeData {
     }
 
     pub fn swap_lists(&mut self, l1: &TreeLocation, l2: &TreeLocation) {
-        let [s1, s2] = if let Ok(slots) = self.slots.get_many_mut([l1.slot, l2.slot]) {
-            slots
-        } else {
+        let Ok([s1, s2]) = self.slots.get_disjoint_mut([l1.slot, l2.slot])
+        else {
             return;
         };
+
         std::mem::swap(&mut s1.list, &mut s2.list);
     }
 
-    /// Returns the widget Id of all the widgets wich a item can be dropped on
+    /// Returns the widget Id of all the widgets which a item can be dropped on
     pub fn todo_options(&self, t_loc: &TreeLocation) -> Vec<Id> {
         let todo_id = if let Some(todo) = self.todo(t_loc) {
             todo.id.clone()
@@ -135,7 +134,7 @@ impl TreeData {
         };
         self.slots
             .iter()
-            .map(|slot| {
+            .flat_map(|slot| {
                 slot.list.todos.iter().filter_map(|todo| {
                     if todo.id != todo_id {
                         Some(todo.id.clone())
@@ -144,7 +143,6 @@ impl TreeData {
                     }
                 })
             })
-            .flatten()
             .chain(self.slots.iter().map(|slot| slot.list.id.clone()))
             .collect()
     }
@@ -161,7 +159,7 @@ static NEXT_SLOT: AtomicUsize = AtomicUsize::new(0);
 pub struct Slot {
     id: Id,
     list: List,
-    c_id: iced::widget::container::Id,
+    c_id: Id,
     highlight: bool,
 }
 
@@ -175,9 +173,9 @@ impl Slot {
     /// Create a new slot with a list
     pub fn new(list: List) -> Self {
         let id = NEXT_SLOT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let c_id = iced::widget::container::Id::new(format!("slot_{}", id));
+        let c_id = Id::from(format!("slot_{}", id));
         Self {
-            id: Id::from(c_id.clone()),
+            id: c_id.clone(),
             c_id,
             list,
             highlight: false,
@@ -185,7 +183,7 @@ impl Slot {
     }
 
     /// Convert the slot into an element that iced can render
-    fn view(&self, index: usize) -> Element<Message> {
+    fn view(&self, index: usize) -> Element<'_, Message> {
         container(self.list.view(index))
             .id(self.c_id.clone())
             .style(if self.highlight {
@@ -203,12 +201,12 @@ impl Slot {
 impl ElementAdder {
     pub fn new(id: usize) -> Self {
         Self {
-            id: iced::widget::text_input::Id::new(format!("todo_adder_{}", id)),
+            id: Id::from(format!("todo_adder_{}", id)),
             text: String::new(),
         }
     }
 
-    pub fn id(&self) -> iced::widget::text_input::Id {
+    pub fn id(&self) -> Id {
         self.id.clone()
     }
 }
@@ -236,7 +234,7 @@ impl List {
     pub fn new(title: &str, todos: Vec<Todo>) -> Self {
         let id = NEXT_LIST.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         Self {
-            id: Id::new(format!("list_{}", id)),
+            id: Id::from(format!("list_{}", id)),
             title: title.to_string(),
             todo_adder: ElementAdder::new(id),
             todos,
@@ -261,7 +259,9 @@ impl List {
     }
 
     pub fn move_todo(&mut self, from: &TreeLocation, to: &TreeLocation) {
-        if let (TreeElement::Todo(i), TreeElement::Todo(j)) = (from.element(), to.element()) {
+        if let (TreeElement::Todo(i), TreeElement::Todo(j)) =
+            (from.element(), to.element())
+        {
             let insert_index = if i < j { j - 1 } else { *j };
             let todo = self.todos.remove(*i);
             self.todos.insert(insert_index, todo);
@@ -273,17 +273,14 @@ impl List {
     }
 
     /// Convert the list into an element that iced can render
-    fn view(&self, slot_index: usize) -> Element<Message> {
+    fn view(&self, slot_index: usize) -> Element<'_, Message> {
         let name = text(self.title.clone())
             .size(20)
             .style(theme::text::list_name);
         let location = TreeLocation::new(slot_index, TreeElement::List);
-        let todos = column(
-            self.todos
-                .iter()
-                .enumerate()
-                .map(|(i, todo)| todo.view(TreeLocation::new(slot_index, TreeElement::Todo(i)))),
-        )
+        let todos = column(self.todos.iter().enumerate().map(|(i, todo)| {
+            todo.view(TreeLocation::new(slot_index, TreeElement::Todo(i)))
+        }))
         .spacing(10.0)
         .width(Length::Fill)
         .height(Length::Shrink)
@@ -307,15 +304,17 @@ impl List {
             .into()
     }
 
-    fn adder(&self, location: TreeLocation) -> Element<Message> {
+    fn adder(&self, location: TreeLocation) -> Element<'_, Message> {
         let input = text_input("Add task...", self.todo_adder.text.as_str())
             .id(self.todo_adder.id.clone())
-            .on_input(move |new_str| Message::UpdateTodoWriter(location, new_str))
+            .on_input(move |new_str| {
+                Message::UpdateTodoWriter(location, new_str)
+            })
             .on_submit(Message::WriteTodo(location))
             .style(theme::text_input::element_adder)
             .size(14.0)
             .width(Length::Fill);
-        let spacing = horizontal_space().width(Length::Fixed(10.0));
+        let spacing = space().width(Length::Fixed(10.0));
         let add_btn = tooltip(
             button(text("+").align_y(Center).align_x(Center))
                 .on_press(Message::WriteTodo(location))
@@ -337,7 +336,7 @@ pub struct Todo {
     pub content: String,
     pub editing: bool,
     id: Id,
-    t_id: iced::widget::text_input::Id,
+    t_id: Id,
     highlight: bool,
 }
 
@@ -352,8 +351,8 @@ impl Todo {
     pub fn new(content: &str) -> Self {
         let id = NEXT_TODO.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         Self {
-            id: Id::new(format!("todo_{}", id)),
-            t_id: iced::widget::text_input::Id::new(format!("todo_input_{}", id)),
+            id: Id::from(format!("todo_{}", id)),
+            t_id: Id::from(format!("todo_input_{}", id)),
             content: content.to_string(),
             highlight: false,
             editing: false,
@@ -361,7 +360,7 @@ impl Todo {
     }
 
     /// Convert the task into an element that iced can render
-    fn view(&self, location: TreeLocation) -> Element<Message> {
+    fn view(&self, location: TreeLocation) -> Element<'_, Message> {
         let txt = text(&self.content)
             .size(15)
             .style(theme::text::todo)
@@ -376,12 +375,13 @@ impl Todo {
             } else {
                 theme::container::todo
             });
-        let element = if !self.editing {
+
+        if !self.editing {
             droppable(content)
                 .id(self.id.clone())
                 .on_click(Message::EditTodo(location, self.t_id.clone()))
                 .on_drop(move |p, r| Message::DropTodo(location, p, r))
-                .on_drag(move |p, r| Message::DragTodo(location, p, r))
+                .on_drag(move |_p, r| Message::DragTodo(location, r))
                 .on_cancel(Message::TodoDropCanceled)
                 .drag_hide(true)
                 .drag_size(Size::ZERO)
@@ -394,7 +394,6 @@ impl Todo {
                 .on_input(move |new_str| Message::UpdateTodo(location, new_str))
                 .on_submit(Message::StopEditingTodo)
                 .into()
-        };
-        element
+        }
     }
 }

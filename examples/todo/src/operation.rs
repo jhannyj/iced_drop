@@ -1,9 +1,13 @@
 use iced::{
-    advanced::widget::{operate, Id, Operation},
-    Task,
+    Rectangle, Task,
+    advanced::widget::{Id, Operation, operate},
 };
 
-pub fn swap_modify_states<Message, State, Modify>(t1: Id, t2: Id, modify: Modify) -> Task<Message>
+pub fn swap_modify_states<Message, State, Modify>(
+    t1: Id,
+    t2: Id,
+    modify: Modify,
+) -> Task<Message>
 where
     Message: Send + 'static,
     State: Clone + Send + 'static,
@@ -38,49 +42,47 @@ where
         State: Clone + Send + 'static,
         Modify: Fn(&State, &State) -> State + Clone + Send + 'static,
     {
-        fn container(
+        fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation<T>)) {
+            if self.t1_state.is_some() && self.t2_state.is_some() {
+                return;
+            }
+            operate(self);
+        }
+
+        fn custom(
             &mut self,
-            _id: Option<&Id>,
-            _bounds: iced::Rectangle,
-            operate_on_children: &mut dyn FnMut(&mut dyn Operation<T>),
+            id: Option<&Id>,
+            _bounds: Rectangle,
+            state: &mut dyn std::any::Any,
         ) {
             if self.t1_state.is_some() && self.t2_state.is_some() {
                 return;
             }
-            operate_on_children(self);
-        }
-
-        fn custom(&mut self, state: &mut dyn std::any::Any, id: Option<&Id>) {
-            if self.t1_state.is_some() && self.t2_state.is_some() {
-                return;
-            }
-            if let Some(state) = state.downcast_mut::<State>() {
-                match id {
-                    Some(id) => {
-                        if id == &self.t1 {
-                            self.t1_state = Some(state.clone());
-                        } else if id == &self.t2 {
-                            self.t2_state = Some(state.clone());
-                        }
+            if let Some(state) = state.downcast_mut::<State>()
+                && let Some(id) = id {
+                    if id == &self.t1 {
+                        self.t1_state = Some(state.clone());
+                    } else if id == &self.t2 {
+                        self.t2_state = Some(state.clone());
                     }
-                    None => (),
                 }
-            }
         }
 
         fn finish(&self) -> iced::advanced::widget::operation::Outcome<T> {
             if self.t1_state.is_none() || self.t2_state.is_none() {
                 iced::advanced::widget::operation::Outcome::None
             } else {
-                iced::advanced::widget::operation::Outcome::Chain(Box::new(SwapModify {
-                    t1: self.t1.clone(),
-                    t2: self.t2.clone(),
-                    modify: self.modify.clone(),
-                    t1_state: self.t1_state.clone().unwrap(),
-                    t2_state: self.t2_state.clone().unwrap(),
-                    swapped_t1: false,
-                    swapped_t2: false,
-                }))
+                iced::advanced::widget::operation::Outcome::Chain(Box::new(
+                    SwapModify {
+                        t1: self.t1.clone(),
+                        t2: self.t2.clone(),
+                        modify: self.modify.clone(),
+                        t1_state: self.t1_state.clone().unwrap(),
+                        t2_state: self.t2_state.clone().unwrap(),
+                        swapped_t1: false,
+                        swapped_t2: false,
+                    },
+                ))
             }
         }
     }
@@ -104,36 +106,32 @@ where
         State: Clone + Send + 'static,
         Modify: Fn(&State, &State) -> State + Clone + Send + 'static,
     {
-        fn container(
+        fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation<T>)) {
+            if self.swapped_t1 && self.swapped_t2 {
+                return;
+            }
+            operate(self);
+        }
+
+        fn custom(
             &mut self,
-            _id: Option<&Id>,
-            _bounds: iced::Rectangle,
-            operate_on_children: &mut dyn FnMut(&mut dyn Operation<T>),
+            id: Option<&Id>,
+            _bounds: Rectangle,
+            state: &mut dyn std::any::Any,
         ) {
             if self.swapped_t1 && self.swapped_t2 {
                 return;
             }
-            operate_on_children(self);
-        }
-
-        fn custom(&mut self, state: &mut dyn std::any::Any, id: Option<&Id>) {
-            if self.swapped_t1 && self.swapped_t2 {
-                return;
-            }
-            if let Some(state) = state.downcast_mut::<State>() {
-                match id {
-                    Some(id) => {
-                        if id == &self.t1 {
-                            *state = (self.modify)(state, &self.t2_state);
-                            self.swapped_t1 = true;
-                        } else if id == &self.t2 {
-                            *state = (self.modify)(state, &self.t1_state);
-                            self.swapped_t2 = true;
-                        }
+            if let Some(state) = state.downcast_mut::<State>()
+                && let Some(id) = id {
+                    if id == &self.t1 {
+                        *state = (self.modify)(state, &self.t2_state);
+                        self.swapped_t1 = true;
+                    } else if id == &self.t2 {
+                        *state = (self.modify)(state, &self.t1_state);
+                        self.swapped_t2 = true;
                     }
-                    None => (),
                 }
-            }
         }
 
         fn finish(&self) -> iced::advanced::widget::operation::Outcome<T> {
