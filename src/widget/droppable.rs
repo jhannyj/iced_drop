@@ -21,6 +21,7 @@ pub struct Droppable<
     drag_threshold: f32,
     on_press: Option<Message>,
     on_click: Option<Message>,
+    on_single_click: Option<Message>,
     on_drop: Option<Box<dyn Fn(Point, Rectangle) -> Message + 'a>>,
     on_drag: Option<Box<dyn Fn(Point, Rectangle) -> Message + 'a>>,
     on_cancel: Option<Message>,
@@ -48,6 +49,7 @@ where
             drag_threshold: 5.0,
             on_press: None,
             on_click: None,
+            on_single_click: None,
             on_drop: None,
             on_drag: None,
             on_cancel: None,
@@ -87,6 +89,12 @@ where
     /// Sets the message that will be produced when the [`Droppable`] is clicked.
     pub fn on_click(mut self, message: Message) -> Self {
         self.on_click = Some(message);
+        self
+    }
+
+    /// Sets the message that will be produced when the [`Droppable`] is clicked, but not dragged.
+    pub fn on_single_click(mut self, message: Message) -> Self {
+        self.on_single_click = Some(message);
         self
     }
 
@@ -328,6 +336,30 @@ where
                             }
                         }
                         _ => (),
+                    },
+                    mouse::Event::ButtonReleased(btn) => {
+                        if btn == mouse::Button::Left {
+                            match state.action {
+                                Action::Select(_) => {
+                                    if let Some(on_single_click) = self.on_single_click.clone() {
+                                        shell.publish(on_single_click);
+                                    }
+                                    state.action = Action::None;
+                                }
+                                Action::Drag(_, current) => {
+                                    // send on drop msg
+                                    let message = (on_drop)(current, state.overlay_bounds);
+                                    shell.publish(message);
+
+                                    if self.reset_delay == 0 {
+                                        state.action = Action::None;
+                                    } else {
+                                        state.action = Action::Wait(self.reset_delay);
+                                    }
+                                }
+                                _ => (),
+                            }
+                        }
                     }
                 }
                 _ => {}
