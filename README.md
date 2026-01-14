@@ -71,3 +71,7 @@ Note: the todo example might also be a good example on how one can use operation
 ## Future Development
 
 Right now it's a little annoying having to work with iced's Id type. At some point, I will work on a drop_zone widget that can take some generic clonable type as an id, and I will create a seperate find_zones operation that will return a list of this custom Id. This should make it easier to determine which drop zones were found.
+
+## Used in the Wild
+
+Iced is still evolving, and part of the fun is seeing how others use it. If iced_drop shows up anywhere in your work, I’d love to link it here so others can explore, learn, and connect.
