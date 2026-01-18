@@ -4,7 +4,7 @@ A small library which provides a custom widget and operation to make drag and dr
 
 ## Easy Usage
 
-1. For ease of use, make sure to enable the `helpers` feature which requires `iced/advanced`
+1. For ease of use, make sure to enable the `helpers` feature which requires `iced_runtime`
 - If you can't enable this feature, the process is very similar. The only difference is that you'd have to implement the helper functions `zones_on_point` and `find_zones` in `lib.rs` yourself.
 - These functions convert the `find_zones` operation into an iced `Task`
 
