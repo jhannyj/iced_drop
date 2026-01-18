@@ -1,7 +1,7 @@
 use iced::Border;
 use iced::{
     Element, Fill, Length, Point, Rectangle, Task,
-    advanced::widget::Id,
+    widget::Id,
     widget::{column, container, row, text},
 };
 use iced_drop::droppable;

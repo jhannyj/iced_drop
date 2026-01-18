@@ -1,12 +1,27 @@
 pub mod widget;
 
-use iced::advanced::graphics::futures::MaybeSend;
-use iced::advanced::renderer;
-use iced::advanced::widget::{Id, operate};
-use iced::task::Task;
-use iced::{Element, Point, Rectangle};
+use iced_core::{renderer, Element};
 use widget::droppable::*;
+
+#[cfg(feature = "helpers")]
+use iced_core::Point;
+#[cfg(feature = "helpers")]
+use iced_core::widget::Id;
+#[cfg(feature = "helpers")]
+use iced_widget::graphics::futures::MaybeSend;
+#[cfg(feature = "helpers")]
+use crate::widget::operation::drop;
+#[cfg(feature = "helpers")]
+use iced_core::Rectangle;
+#[cfg(feature = "helpers")]
+use iced::advanced::widget::operate;
+#[cfg(feature = "helpers")]
+use iced::Task;
+
+#[cfg(not(feature = "helpers"))]
 use widget::operation::drop;
+#[cfg(not(feature = "helpers"))]
+pub use drop::find_zones;
 
 pub fn droppable<'a, Message, Theme, Renderer>(
     content: impl Into<Element<'a, Message, Theme, Renderer>>,
@@ -18,6 +33,7 @@ where
     Droppable::new(content)
 }
 
+#[cfg(feature = "helpers")]
 pub fn zones_on_point<T, MF>(
     msg: MF,
     point: Point,
@@ -33,9 +49,10 @@ where
         options,
         depth,
     ))
-    .map(msg)
+        .map(msg)
 }
 
+#[cfg(feature = "helpers")]
 pub fn find_zones<Message, MF, F>(
     msg: MF,
     filter: F,
@@ -45,10 +62,10 @@ pub fn find_zones<Message, MF, F>(
 where
     Message: Send + 'static,
     MF: Fn(Vec<(Id, Rectangle)>) -> Message
-        + MaybeSend
-        + Sync
-        + Clone
-        + 'static,
+    + MaybeSend
+    + Sync
+    + Clone
+    + 'static,
     F: Fn(&Rectangle) -> bool + Send + 'static,
 {
     operate(drop::find_zones(filter, options, depth)).map(msg)

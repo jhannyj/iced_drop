@@ -1,11 +1,11 @@
-use iced::advanced::widget::operation::{Outcome, Scrollable};
-use iced::advanced::widget::{Id, Operation};
-use iced::{Rectangle, Vector};
+use iced_core::{Rectangle, Vector};
+use iced_core::widget::{Id, Operation};
+use iced_core::widget::operation::{Outcome, Scrollable};
 
 /// Produces an [`Operation`] that will find the drop zones that pass a filter on the zone's bounds.
 /// For any drop zone to be considered, the Element must have some Id.
 /// If `options` is `None`, all drop zones will be considered.
-/// Depth determines how how deep into nested drop zones to go.
+/// Depth determines how deep into nested drop zones to go.
 /// If 'depth' is `None`, nested dropzones will be fully explored
 pub fn find_zones<F>(
     filter: F,
@@ -29,7 +29,16 @@ where
     where
         F: Fn(&Rectangle) -> bool + Send + 'static,
     {
-        fn container(&mut self, id: Option<&Id>, bounds: iced::Rectangle) {
+        fn traverse(
+            &mut self,
+            operate: &mut dyn FnMut(&mut dyn Operation<Vec<(Id, Rectangle)>>),
+        ) {
+            if self.goto_next {
+                operate(self);
+            }
+        }
+
+        fn container(&mut self, id: Option<&Id>, bounds: Rectangle) {
             if let Some(id) = id {
                 let is_option = match &self.options {
                     Some(options) => options.contains(id),
@@ -47,19 +56,6 @@ where
             };
         }
 
-        fn traverse(
-            &mut self,
-            operate: &mut dyn FnMut(&mut dyn Operation<Vec<(Id, Rectangle)>>),
-        ) {
-            if self.goto_next {
-                operate(self);
-            }
-        }
-
-        fn finish(&self) -> Outcome<Vec<(Id, Rectangle)>> {
-            Outcome::Some(self.zones.clone())
-        }
-
         fn scrollable(
             &mut self,
             _id: Option<&Id>,
@@ -71,6 +67,10 @@ where
             if (self.filter)(&bounds) {
                 self.offset += translation;
             }
+        }
+
+        fn finish(&self) -> Outcome<Vec<(Id, Rectangle)>> {
+            Outcome::Some(self.zones.clone())
         }
     }
 

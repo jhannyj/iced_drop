@@ -1,15 +1,14 @@
 use std::time::Instant;
 
 use highlight::{
-    Highlight, Highlightable, ZoneUpdate, should_update_droppable, zone_update,
+    should_update_droppable, zone_update, Highlight, Highlightable, ZoneUpdate,
 };
 use iced::{
-    Element, Length, Point, Rectangle, Task,
-    advanced::widget::Id,
-    widget::operation::focus,
-    widget::{column, container, text},
+    advanced::widget::Id, widget::operation::focus, widget::{column, container, text}, Element, Length,
+    Point,
+    Rectangle,
+    Task,
 };
-use iced_drop::find_zones;
 use iced_drop::widget::droppable::State as DroppableState;
 use operation::swap_modify_states;
 use tree::{List, Slot, Todo, TreeData, TreeElement, TreeLocation};
@@ -60,8 +59,8 @@ struct TodoBoard {
     tree: TreeData,
     clicked: (TreeLocation, Instant),
     editing: Option<TreeLocation>,
-    todos_highlight: highlight::Highlight,
-    lists_highlight: highlight::Highlight,
+    todos_highlight: Highlight,
+    lists_highlight: Highlight,
 }
 
 impl Default for TodoBoard {
@@ -146,7 +145,7 @@ impl TodoBoard {
                         todo.set_highlight(true)
                     }
                 self.todos_highlight = new_highlight;
-                return find_zones(
+                return iced_drop::find_zones(
                     Message::HandleTodoZones,
                     move |zone_bounds| zone_bounds.intersects(&t_bounds),
                     Some(self.tree.todo_options(&t_loc)),
@@ -197,7 +196,7 @@ impl TodoBoard {
                     self.tree.list_mut(&l_loc).set_highlight(false);
                 }
                 self.lists_highlight = new_highlight;
-                return find_zones(
+                return iced_drop::find_zones(
                     Message::HandleListZones,
                     move |zone_bounds| zone_bounds.intersects(&l_bounds),
                     Some(self.tree.list_options()),

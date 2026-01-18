@@ -1,23 +1,25 @@
 //! Encapsulates a widget that can be dragged and dropped.
+use iced_core::layout::{Limits, Node};
+use iced_core::widget::{Id, Operation, Tree};
+use iced_core::{mouse, overlay, renderer, window, Element, Event, Layout, Length, Pixels, Point, Rectangle, Size, Vector, Widget};
 use std::fmt::Debug;
 use std::vec;
-
-use iced::advanced::widget::{Operation, Tree, Widget};
-use iced::advanced::{self, Layout, layout, mouse, overlay, renderer};
-use iced::{Element, Pixels, Point, Rectangle, Size, Vector};
+use iced_core::mouse::Cursor;
+use iced_core::renderer::Style;
+use iced_core::widget::tree::Tag;
 
 /// An element that can be dragged and dropped on a [`DropZone`]
 pub struct Droppable<
     'a,
     Message,
-    Theme = iced::Theme,
-    Renderer = iced::Renderer,
+    Theme = iced_widget::Theme,
+    Renderer = iced_widget::Renderer,
 > where
     Message: Clone,
     Renderer: renderer::Renderer,
 {
     content: Element<'a, Message, Theme, Renderer>,
-    id: Option<iced::advanced::widget::Id>,
+    id: Option<Id>,
     drag_threshold: f32,
     on_press: Option<Message>,
     on_click: Option<Message>,
@@ -64,7 +66,7 @@ where
     }
 
     /// Sets the unique identifier of the [`Droppable`].
-    pub fn id(mut self, id: iced::advanced::widget::Id) -> Self {
+    pub fn id(mut self, id: Id) -> Self {
         self.id = Some(id);
         self
     }
@@ -157,12 +159,12 @@ where
     /// Sets the number of frames/layout calls to wait before resetting the size of the [`Droppable`] after dropping.
     ///
     /// This is useful for cases where the [`Droppable`] is being moved to a new location after some widget operation.
-    /// In this case, the [`Droppable`] will mainting the 'drag_size' for the given number of frames before resetting to its original size.
+    /// In this case, the [`Droppable`] will maintain the 'drag_size' for the given number of frames before resetting to its original size.
     /// This prevents the [`Droppable`] from 'jumping' back to its original size before the new location is rendered which
     /// prevents flickering.
     ///
-    /// Warning: this should only be set if there's is some noticeble flickering when the [`Droppable`] is dropped. That is, if the
-    /// [`Droppable`] returns to its original size before it's moved to it's new location.
+    /// Warning: this should only be set if there is some noticeable flickering when the [`Droppable`] is dropped. That is, if the
+    /// [`Droppable`] returns to its original size before it's moved to its new location.
     pub fn reset_delay(mut self, reset_delay: usize) -> Self {
         self.reset_delay = reset_delay;
         self
@@ -175,36 +177,125 @@ where
     Message: Clone,
     Renderer: renderer::Renderer,
 {
-    fn state(&self) -> iced::advanced::widget::tree::State {
-        advanced::widget::tree::State::new(State::default())
+    fn size(&self) -> Size<Length> {
+        self.content.as_widget().size()
     }
 
-    fn tag(&self) -> iced::advanced::widget::tree::Tag {
-        advanced::widget::tree::Tag::of::<State>()
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &Renderer,
+        limits: &Limits,
+    ) -> Node {
+        let state: &mut State = tree.state.downcast_mut::<State>();
+        let content_node = self.content.as_widget_mut().layout(
+            &mut tree.children[0],
+            renderer,
+            limits,
+        );
+
+        // Adjust the size of the original widget if it's being dragged or we're wating to reset the size
+        if let Some(new_size) = self.drag_size {
+            match state.action {
+                Action::Drag(_, _) => {
+                    return Node::with_children(
+                        new_size,
+                        content_node.children().to_vec(),
+                    );
+                }
+                Action::Wait(reveal_index) => {
+                    if reveal_index <= 1 {
+                        state.action = Action::None;
+                    } else {
+                        state.action = Action::Wait(reveal_index - 1);
+                    }
+
+                    return Node::with_children(
+                        new_size,
+                        content_node.children().to_vec(),
+                    );
+                }
+                _ => (),
+            }
+        }
+
+        content_node
     }
 
-    fn children(&self) -> Vec<iced::advanced::widget::Tree> {
-        vec![advanced::widget::Tree::new(&self.content)]
+    fn draw(
+        &self,
+        tree: &Tree,
+        renderer: &mut Renderer,
+        theme: &Theme,
+        style: &Style,
+        layout: Layout<'_>,
+        cursor: Cursor,
+        viewport: &Rectangle,
+    ) {
+        let state: &State = tree.state.downcast_ref::<State>();
+        if let Action::Drag(_, _) = state.action
+            && self.drag_hide
+        {
+            return;
+        }
+
+        self.content.as_widget().draw(
+            &tree.children[0],
+            renderer,
+            theme,
+            style,
+            layout,
+            cursor,
+            viewport,
+        );
     }
 
-    fn diff(&self, tree: &mut iced::advanced::widget::Tree) {
+    fn tag(&self) -> Tag {
+        Tag::of::<State>()
+    }
+
+    fn state(&self) -> iced_core::widget::tree::State {
+        iced_core::widget::tree::State::new(State::default())
+    }
+
+    fn children(&self) -> Vec<Tree> {
+        vec![Tree::new(&self.content)]
+    }
+
+    fn diff(&self, tree: &mut Tree) {
         tree.diff_children(std::slice::from_ref(&self.content))
     }
 
-    fn size(&self) -> iced::Size<iced::Length> {
-        self.content.as_widget().size()
+    fn operate(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        renderer: &Renderer,
+        operation: &mut dyn Operation,
+    ) {
+        let state = tree.state.downcast_mut::<State>();
+        operation.custom(self.id.as_ref(), layout.bounds(), state);
+        operation.container(self.id.as_ref(), layout.bounds());
+        operation.traverse(&mut |operation| {
+            self.content.as_widget_mut().operate(
+                &mut tree.children[0],
+                layout,
+                renderer,
+                operation,
+            );
+        });
     }
 
     fn update(
         &mut self,
-        tree: &mut iced::advanced::widget::Tree,
-        event: &iced::Event,
-        layout: iced::advanced::Layout<'_>,
-        cursor: iced::advanced::mouse::Cursor,
+        tree: &mut Tree,
+        event: &Event,
+        layout: Layout<'_>,
+        cursor: Cursor,
         _renderer: &Renderer,
-        _clipboard: &mut dyn iced::advanced::Clipboard,
-        shell: &mut iced::advanced::Shell<'_, Message>,
-        _viewport: &iced::Rectangle,
+        _clipboard: &mut dyn iced_core::Clipboard,
+        shell: &mut iced_core::Shell<'_, Message>,
+        _viewport: &Rectangle,
     ) {
         let state = tree.state.downcast_mut::<State>();
 
@@ -220,7 +311,7 @@ where
                 shell,
                 _viewport,
             );
-            // this should really only be captured if the droppable is nested or it contains some other
+            // this should really only be captured if the droppable is nested, or it contains some other
             // widget that captures the event
             if shell.is_event_captured() {
                 return;
@@ -228,7 +319,7 @@ where
         }
 
         if let Some(on_drop) = self.on_drop.as_deref()
-            && let iced::Event::Mouse(mouse) = event
+            && let Event::Mouse(mouse) = event
         {
             match mouse {
                 mouse::Event::ButtonPressed(btn) => {
@@ -355,7 +446,7 @@ where
             Status::Active
         };
 
-        if let iced::Event::Window(iced::window::Event::RedrawRequested(_now)) =
+        if let Event::Window(window::Event::RedrawRequested(_now)) =
             event
         {
             self.status = Some(current_status);
@@ -364,130 +455,14 @@ where
         }
     }
 
-    fn layout(
-        &mut self,
-        tree: &mut iced::advanced::widget::Tree,
-        renderer: &Renderer,
-        limits: &iced::advanced::layout::Limits,
-    ) -> iced::advanced::layout::Node {
-        let state: &mut State = tree.state.downcast_mut::<State>();
-        let content_node = self.content.as_widget_mut().layout(
-            &mut tree.children[0],
-            renderer,
-            limits,
-        );
-
-        // Adjust the size of the original widget if it's being dragged or we're wating to reset the size
-        if let Some(new_size) = self.drag_size {
-            match state.action {
-                Action::Drag(_, _) => {
-                    return iced::advanced::layout::Node::with_children(
-                        new_size,
-                        content_node.children().to_vec(),
-                    );
-                }
-                Action::Wait(reveal_index) => {
-                    if reveal_index <= 1 {
-                        state.action = Action::None;
-                    } else {
-                        state.action = Action::Wait(reveal_index - 1);
-                    }
-
-                    return iced::advanced::layout::Node::with_children(
-                        new_size,
-                        content_node.children().to_vec(),
-                    );
-                }
-                _ => (),
-            }
-        }
-
-        content_node
-    }
-
-    fn operate(
-        &mut self,
-        tree: &mut Tree,
-        layout: Layout<'_>,
-        renderer: &Renderer,
-        operation: &mut dyn Operation,
-    ) {
-        let state = tree.state.downcast_mut::<State>();
-        operation.custom(self.id.as_ref(), layout.bounds(), state);
-        operation.container(self.id.as_ref(), layout.bounds());
-        operation.traverse(&mut |operation| {
-            self.content.as_widget_mut().operate(
-                &mut tree.children[0],
-                layout,
-                renderer,
-                operation,
-            );
-        });
-    }
-
-    fn draw(
-        &self,
-        tree: &iced::advanced::widget::Tree,
-        renderer: &mut Renderer,
-        theme: &Theme,
-        style: &renderer::Style,
-        layout: iced::advanced::Layout<'_>,
-        cursor: iced::advanced::mouse::Cursor,
-        viewport: &iced::Rectangle,
-    ) {
-        let state: &State = tree.state.downcast_ref::<State>();
-        if let Action::Drag(_, _) = state.action
-            && self.drag_hide
-        {
-            return;
-        }
-
-        self.content.as_widget().draw(
-            &tree.children[0],
-            renderer,
-            theme,
-            style,
-            layout,
-            cursor,
-            viewport,
-        );
-    }
-
-    fn overlay<'b>(
-        &'b mut self,
-        tree: &'b mut Tree,
-        layout: Layout<'b>,
-        renderer: &Renderer,
-        _viewport: &iced::Rectangle,
-        _translation: Vector,
-    ) -> Option<overlay::Element<'b, Message, Theme, Renderer>> {
-        let state: &mut State = tree.state.downcast_mut::<State>();
-        if self.drag_overlay
-            && let Action::Drag(_, _) = state.action
-        {
-            return Some(overlay::Element::new(Box::new(Overlay {
-                content: &mut self.content,
-                tree: &mut tree.children[0],
-                overlay_bounds: state.overlay_bounds,
-            })));
-        }
-        self.content.as_widget_mut().overlay(
-            &mut tree.children[0],
-            layout,
-            renderer,
-            _viewport,
-            _translation,
-        )
-    }
-
     fn mouse_interaction(
         &self,
-        tree: &iced::advanced::widget::Tree,
-        layout: iced::advanced::Layout<'_>,
-        cursor: iced::advanced::mouse::Cursor,
-        _viewport: &iced::Rectangle,
+        tree: &Tree,
+        layout: Layout<'_>,
+        cursor: Cursor,
+        _viewport: &Rectangle,
         _renderer: &Renderer,
-    ) -> iced::advanced::mouse::Interaction {
+    ) -> mouse::Interaction {
         let state = tree.state.downcast_ref::<State>();
 
         if let Action::Drag(_, _) = state.action {
@@ -519,6 +494,33 @@ where
         } else {
             mouse::Interaction::default()
         }
+    }
+
+    fn overlay<'b>(
+        &'b mut self,
+        tree: &'b mut Tree,
+        layout: Layout<'b>,
+        renderer: &Renderer,
+        _viewport: &Rectangle,
+        _translation: Vector,
+    ) -> Option<overlay::Element<'b, Message, Theme, Renderer>> {
+        let state: &mut State = tree.state.downcast_mut::<State>();
+        if self.drag_overlay
+            && let Action::Drag(_, _) = state.action
+        {
+            return Some(overlay::Element::new(Box::new(Overlay {
+                content: &mut self.content,
+                tree: &mut tree.children[0],
+                overlay_bounds: state.overlay_bounds,
+            })));
+        }
+        self.content.as_widget_mut().overlay(
+            &mut tree.children[0],
+            layout,
+            renderer,
+            _viewport,
+            _translation,
+        )
     }
 }
 
@@ -569,7 +571,7 @@ where
     Renderer: renderer::Renderer,
 {
     content: &'b mut Element<'a, Message, Theme, Renderer>,
-    tree: &'b mut advanced::widget::Tree,
+    tree: &'b mut Tree,
     overlay_bounds: Rectangle,
 }
 
@@ -579,12 +581,12 @@ impl<'a, 'b, Message, Theme, Renderer>
 where
     Renderer: renderer::Renderer,
 {
-    fn layout(&mut self, renderer: &Renderer, _bounds: Size) -> layout::Node {
+    fn layout(&mut self, renderer: &Renderer, _bounds: Size) -> Node {
         Widget::<Message, Theme, Renderer>::layout(
             self.content.as_widget_mut(),
             self.tree,
             renderer,
-            &layout::Limits::new(Size::ZERO, self.overlay_bounds.size()),
+            &Limits::new(Size::ZERO, self.overlay_bounds.size()),
         )
         .move_to(self.overlay_bounds.position())
     }
@@ -593,9 +595,9 @@ where
         &self,
         renderer: &mut Renderer,
         theme: &Theme,
-        inherited_style: &renderer::Style,
+        inherited_style: &Style,
         layout: Layout<'_>,
-        cursor_position: mouse::Cursor,
+        cursor_position: Cursor,
     ) {
         Widget::<Message, Theme, Renderer>::draw(
             self.content.as_widget(),
