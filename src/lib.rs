@@ -14,9 +14,9 @@ use crate::widget::operation::drop;
 #[cfg(feature = "helpers")]
 use iced_core::Rectangle;
 #[cfg(feature = "helpers")]
-use iced::advanced::widget::operate;
+use iced_runtime::task::widget as operate;
 #[cfg(feature = "helpers")]
-use iced::Task;
+use iced_runtime::Task;
 
 #[cfg(not(feature = "helpers"))]
 use widget::operation::drop;

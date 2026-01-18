@@ -7,10 +7,10 @@ rust-version = "1.88"
 [dependencies]
 iced_core = "0.14"
 iced_widget = "0.14"
-iced = { version = "0.14", optional = true }
+iced_runtime = { version = "0.14", optional = true }
 
 [workspace]
 members = ["examples/*"]
 
 [features]
-helpers = ["iced/advanced"]
+helpers = ["iced_runtime"]
