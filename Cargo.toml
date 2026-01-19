@@ -5,12 +5,17 @@ edition = "2024"
 rust-version = "1.88"
 
 [dependencies]
-iced_core = "0.14"
-iced_widget = "0.14"
-iced_runtime = { version = "0.14", optional = true }
+iced_core = "0.15.0-dev"
+iced_widget = "0.15.0-dev"
+iced_runtime = { version = "0.15.0-dev", optional = true }
 
 [workspace]
 members = ["examples/*"]
 
 [features]
 helpers = ["iced_runtime"]
+
+[patch.crates-io]
+iced_core = { git = "https://github.com/iced-rs/iced.git" }
+iced_runtime = { git = "https://github.com/iced-rs/iced.git" }
+iced_widget = { git = "https://github.com/iced-rs/iced.git" }
