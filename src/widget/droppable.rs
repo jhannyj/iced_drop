@@ -1,4 +1,6 @@
 //! Encapsulates a widget that can be dragged and dropped.
+use std::fmt::Debug;
+
 use iced_core::layout::{Limits, Node};
 use iced_core::mouse::Cursor;
 use iced_core::renderer::Style;
@@ -8,8 +10,6 @@ use iced_core::{
     Element, Event, Layout, Length, Pixels, Point, Rectangle, Size, Vector,
     Widget, mouse, overlay, renderer, touch, window,
 };
-use std::fmt::Debug;
-use std::vec;
 
 /// An element that can be dragged and dropped on a [`DropZone`]
 pub struct Droppable<
@@ -257,12 +257,8 @@ where
         iced_core::widget::tree::State::new(State::default())
     }
 
-    fn children(&self) -> Vec<Tree> {
-        vec![Tree::new(&self.content)]
-    }
-
-    fn diff(&self, tree: &mut Tree) {
-        tree.diff_children(std::slice::from_ref(&self.content))
+    fn diff(&mut self, tree: &mut Tree) {
+        tree.diff_children(std::slice::from_mut(&mut self.content))
     }
 
     fn operate(
@@ -380,10 +376,9 @@ where
                 }
                 Event::Mouse(mouse::Event::CursorMoved { position })
                 | Event::Touch(touch::Event::FingerMoved {
-                    position,
-                    ..
+                    position, ..
                 }) => {
-                    let mut position = position.clone();
+                    let mut position = *position;
 
                     let should_drag = match state.action {
                         Action::Select(start) => {
