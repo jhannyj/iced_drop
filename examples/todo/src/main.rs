@@ -4,10 +4,11 @@ use highlight::{
     should_update_droppable, zone_update, Highlight, Highlightable, ZoneUpdate,
 };
 use iced::{
-    advanced::widget::Id, widget::operation::focus, widget::{column, container, text}, Element, Length,
+    advanced::widget::Id, widget::operation::focus, widget::{column, container, text}, Length,
     Point,
     Rectangle,
     Task,
+    Widget,
 };
 use iced_drop::widget::droppable::State as DroppableState;
 use operation::swap_modify_states;
@@ -88,7 +89,7 @@ impl TodoBoard {
         iced::Theme::CatppuccinFrappe
     }
 
-    fn view(&self) -> Element<'_, Message> {
+    fn view(&self) -> impl Widget<Message> {
         let header =
             container(text("TODO Board").size(30).style(theme::text::title))
                 .padding(10.0)
@@ -103,7 +104,6 @@ impl TodoBoard {
         .width(Length::Fill)
         .height(Length::Fill)
         .style(theme::container::background)
-        .into()
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {

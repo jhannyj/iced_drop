@@ -1,27 +1,19 @@
 //! Encapsulates a widget that can be dragged and dropped.
 use std::fmt::Debug;
 
-use iced_core::layout::{Limits, Node};
+use iced_core::layout::Limits;
 use iced_core::mouse::Cursor;
 use iced_core::renderer::Style;
 use iced_core::widget::tree::Tag;
-use iced_core::widget::{Id, Operation, Tree};
+use iced_core::widget::{Id, Meta, Operation, Tree};
 use iced_core::{
-    Element, Event, Layout, Length, Pixels, Point, Rectangle, Size, Vector,
-    Widget, mouse, overlay, renderer, touch, window,
+    Event, Layout, Length, Pixels, Point, Rectangle, Size, Vector, Widget,
+    mouse, overlay, renderer, touch, window,
 };
 
 /// An element that can be dragged and dropped on a [`DropZone`]
-pub struct Droppable<
-    'a,
-    Message,
-    Theme = iced_widget::Theme,
-    Renderer = iced_widget::Renderer,
-> where
-    Message: Clone,
-    Renderer: renderer::Renderer,
-{
-    content: Element<'a, Message, Theme, Renderer>,
+pub struct Droppable<'a, Message, W = iced_widget::Element<'a, Message>> {
+    content: W,
     id: Option<Id>,
     drag_threshold: f32,
     on_press: Option<Message>,
@@ -38,17 +30,14 @@ pub struct Droppable<
     status: Option<Status>,
 }
 
-impl<'a, Message, Theme, Renderer> Droppable<'a, Message, Theme, Renderer>
+impl<'a, Message, W> Droppable<'a, Message, W>
 where
     Message: Clone,
-    Renderer: renderer::Renderer,
 {
     /// Creates a new [`Droppable`].
-    pub fn new(
-        content: impl Into<Element<'a, Message, Theme, Renderer>>,
-    ) -> Self {
+    pub fn new(content: W) -> Self {
         Self {
-            content: content.into(),
+            content,
             id: None,
             drag_threshold: 5.0,
             on_press: None,
@@ -170,14 +159,17 @@ where
     }
 }
 
-impl<'a, Message, Theme, Renderer> Widget<Message, Theme, Renderer>
-    for Droppable<'a, Message, Theme, Renderer>
+impl<Message, W> Meta for Droppable<'_, Message, W> {}
+
+impl<'a, Message, W, Theme, Renderer> Widget<Message, Theme, Renderer>
+    for Droppable<'a, Message, W>
 where
     Message: Clone,
+    W: Widget<Message, Theme, Renderer>,
     Renderer: renderer::Renderer,
 {
     fn size(&self) -> Size<Length> {
-        self.content.as_widget().size()
+        self.content.size()
     }
 
     fn layout(
@@ -185,22 +177,18 @@ where
         tree: &mut Tree,
         renderer: &Renderer,
         limits: &Limits,
-    ) -> Node {
+    ) {
+        self.content.layout(&mut tree.children[0], renderer, limits);
+
+        tree.size = tree.children[0].size;
+
         let state: &mut State = tree.state.downcast_mut::<State>();
-        let content_node = self.content.as_widget_mut().layout(
-            &mut tree.children[0],
-            renderer,
-            limits,
-        );
 
         // Adjust the size of the original widget if it's being dragged or we're wating to reset the size
         if let Some(new_size) = self.drag_size {
             match state.action {
                 Action::Drag(_, _) => {
-                    return Node::with_children(
-                        new_size,
-                        content_node.children().to_vec(),
-                    );
+                    tree.size = new_size;
                 }
                 Action::Wait(reveal_index) => {
                     if reveal_index <= 1 {
@@ -209,16 +197,11 @@ where
                         state.action = Action::Wait(reveal_index - 1);
                     }
 
-                    return Node::with_children(
-                        new_size,
-                        content_node.children().to_vec(),
-                    );
+                    tree.size = new_size;
                 }
                 _ => (),
             }
         }
-
-        content_node
     }
 
     fn draw(
@@ -227,7 +210,7 @@ where
         renderer: &mut Renderer,
         theme: &Theme,
         style: &Style,
-        layout: Layout<'_>,
+        layout: Layout,
         cursor: Cursor,
         viewport: &Rectangle,
     ) {
@@ -238,7 +221,7 @@ where
             return;
         }
 
-        self.content.as_widget().draw(
+        self.content.draw(
             &tree.children[0],
             renderer,
             theme,
@@ -264,17 +247,19 @@ where
     fn operate(
         &mut self,
         tree: &mut Tree,
-        layout: Layout<'_>,
+        layout: Layout,
+        viewport: &Rectangle,
         renderer: &Renderer,
         operation: &mut dyn Operation,
     ) {
         let state = tree.state.downcast_mut::<State>();
         operation.custom(self.id.as_ref(), layout.bounds(), state);
-        operation.container(self.id.as_ref(), layout.bounds());
+        operation.container(self.id.as_ref(), layout.bounds(), viewport);
         operation.traverse(&mut |operation| {
-            self.content.as_widget_mut().operate(
+            self.content.operate(
                 &mut tree.children[0],
                 layout,
+                viewport,
                 renderer,
                 operation,
             );
@@ -285,7 +270,7 @@ where
         &mut self,
         tree: &mut Tree,
         event: &Event,
-        layout: Layout<'_>,
+        layout: Layout,
         cursor: Cursor,
         _renderer: &Renderer,
         shell: &mut iced_core::Shell<'_, Message>,
@@ -295,7 +280,7 @@ where
 
         if !matches!(state.action, Action::Drag(_, _)) {
             // handle the on event of the content first, in case that the droppable is nested
-            self.content.as_widget_mut().update(
+            self.content.update(
                 &mut tree.children[0],
                 event,
                 layout,
@@ -461,7 +446,7 @@ where
     fn mouse_interaction(
         &self,
         tree: &Tree,
-        layout: Layout<'_>,
+        layout: Layout,
         cursor: Cursor,
         _viewport: &Rectangle,
         _renderer: &Renderer,
@@ -472,7 +457,7 @@ where
             return mouse::Interaction::Grabbing;
         }
 
-        let child_interact = self.content.as_widget().mouse_interaction(
+        let child_interact = self.content.mouse_interaction(
             &tree.children[0],
             layout,
             cursor,
@@ -502,42 +487,33 @@ where
     fn overlay<'b>(
         &'b mut self,
         tree: &'b mut Tree,
-        layout: Layout<'b>,
+        layout: Layout,
         renderer: &Renderer,
         _viewport: &Rectangle,
         _translation: Vector,
-    ) -> Option<overlay::Element<'b, Message, Theme, Renderer>> {
+        _window: Size,
+    ) -> Vec<overlay::Element<'b, Message, Theme, Renderer>> {
         let state: &mut State = tree.state.downcast_mut::<State>();
         if self.drag_overlay
             && let Action::Drag(_, _) = state.action
         {
-            return Some(overlay::Element::new(Box::new(Overlay {
-                content: &mut self.content,
-                tree: &mut tree.children[0],
-                overlay_bounds: state.overlay_bounds,
-            })));
+            let content_tree = &tree.children[0];
+
+            return vec![overlay::Element::new(Box::new(Overlay {
+                content: &self.content,
+                tree: content_tree,
+                layout: Layout::new(content_tree.size)
+                    .move_to(state.overlay_bounds.position()),
+            }))];
         }
-        self.content.as_widget_mut().overlay(
+        self.content.overlay(
             &mut tree.children[0],
             layout,
             renderer,
             _viewport,
             _translation,
+            _window,
         )
-    }
-}
-
-impl<'a, Message, Theme, Renderer> From<Droppable<'a, Message, Theme, Renderer>>
-    for Element<'a, Message, Theme, Renderer>
-where
-    Message: 'a + Clone,
-    Theme: 'a,
-    Renderer: 'a + renderer::Renderer,
-{
-    fn from(
-        droppable: Droppable<'a, Message, Theme, Renderer>,
-    ) -> Element<'a, Message, Theme, Renderer> {
-        Element::new(droppable)
     }
 }
 
@@ -569,48 +545,35 @@ pub enum Action {
     Wait(usize),
 }
 
-struct Overlay<'a, 'b, Message, Theme, Renderer>
-where
-    Renderer: renderer::Renderer,
-{
-    content: &'b mut Element<'a, Message, Theme, Renderer>,
-    tree: &'b mut Tree,
-    overlay_bounds: Rectangle,
+struct Overlay<'b, W> {
+    content: &'b W,
+    tree: &'b Tree,
+    layout: Layout,
 }
 
-impl<'a, 'b, Message, Theme, Renderer>
-    overlay::Overlay<Message, Theme, Renderer>
-    for Overlay<'a, 'b, Message, Theme, Renderer>
+impl<'b, Message, W, Theme, Renderer> overlay::Overlay<Message, Theme, Renderer>
+    for Overlay<'b, W>
 where
+    W: Widget<Message, Theme, Renderer>,
     Renderer: renderer::Renderer,
 {
-    fn layout(&mut self, renderer: &Renderer, _bounds: Size) -> Node {
-        Widget::<Message, Theme, Renderer>::layout(
-            self.content.as_widget_mut(),
-            self.tree,
-            renderer,
-            &Limits::new(Size::ZERO, self.overlay_bounds.size()),
-        )
-        .move_to(self.overlay_bounds.position())
-    }
-
     fn draw(
         &self,
         renderer: &mut Renderer,
         theme: &Theme,
         inherited_style: &Style,
-        layout: Layout<'_>,
         cursor_position: Cursor,
     ) {
-        Widget::<Message, Theme, Renderer>::draw(
-            self.content.as_widget(),
-            self.tree,
-            renderer,
-            theme,
-            inherited_style,
-            layout,
-            cursor_position,
-            &Rectangle::with_size(Size::INFINITE),
-        );
+        renderer.with_layer(self.layout.bounds(), |renderer| {
+            self.content.draw(
+                self.tree,
+                renderer,
+                theme,
+                inherited_style,
+                self.layout,
+                cursor_position,
+                &Rectangle::with_size(Size::INFINITE),
+            );
+        });
     }
 }

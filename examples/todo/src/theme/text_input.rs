@@ -9,7 +9,6 @@ pub fn element_adder(_theme: &Theme, _status: Status) -> Style {
             width: 1.0,
             radius: 10.0.into(),
         },
-        icon: Color::BLACK,
         placeholder: color!(131, 122, 117, 0.7),
         value: color!(131, 122, 117),
         selection: Color::WHITE,
