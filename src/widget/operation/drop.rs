@@ -1,6 +1,6 @@
-use iced_core::{Rectangle, Vector};
-use iced_core::widget::{Id, Operation};
 use iced_core::widget::operation::{Outcome, Scrollable};
+use iced_core::widget::{Id, Operation};
+use iced_core::{Rectangle, Size, Vector};
 
 /// Produces an [`Operation`] that will find the drop zones that pass a filter on the zone's bounds.
 /// For any drop zone to be considered, the Element must have some Id.
@@ -38,7 +38,12 @@ where
             }
         }
 
-        fn container(&mut self, id: Option<&Id>, bounds: Rectangle) {
+        fn container(
+            &mut self,
+            id: Option<&Id>,
+            bounds: Rectangle,
+            _viewport: &Rectangle,
+        ) {
             if let Some(id) = id {
                 let is_option = match &self.options {
                     Some(options) => options.contains(id),
@@ -60,7 +65,7 @@ where
             &mut self,
             _id: Option<&Id>,
             bounds: Rectangle,
-            _content_bounds: Rectangle,
+            _content: Size,
             translation: Vector,
             _state: &mut dyn Scrollable,
         ) {
@@ -81,6 +86,6 @@ where
         max_depth: depth,
         c_depth: 0,
         offset: Vector { x: 0.0, y: 0.0 },
-        goto_next: false,
+        goto_next: true,
     }
 }

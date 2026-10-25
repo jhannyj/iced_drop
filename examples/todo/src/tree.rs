@@ -3,7 +3,7 @@ use std::sync::atomic::AtomicUsize;
 use iced::advanced::widget::Id;
 use iced::widget::tooltip;
 use iced::{
-    Center, Element, Length, Size, alignment,
+    Center, Length, Size, Widget, alignment,
     widget::{button, column, container, row, space, text, text_input},
 };
 use iced_drop::droppable;
@@ -57,7 +57,7 @@ impl TreeData {
         Self { slots }
     }
     /// Convert the tree into an element that iced can render
-    pub fn view(&self) -> Element<'_, Message> {
+    pub fn view(&self) -> impl Widget<Message> {
         let children =
             self.slots.iter().enumerate().map(|(i, slot)| slot.view(i));
         row(children)
@@ -65,7 +65,6 @@ impl TreeData {
             .padding(20.0)
             .width(Length::Fill)
             .height(Length::Fill)
-            .into()
     }
 
     pub fn find(&self, id: &Id) -> Option<TreeLocation> {
@@ -183,7 +182,7 @@ impl Slot {
     }
 
     /// Convert the slot into an element that iced can render
-    fn view(&self, index: usize) -> Element<'_, Message> {
+    fn view(&self, index: usize) -> impl Widget<Message> {
         container(self.list.view(index))
             .id(self.c_id.clone())
             .style(if self.highlight {
@@ -194,7 +193,6 @@ impl Slot {
             .width(Length::Fill)
             .height(Length::Fill)
             .padding(3.5)
-            .into()
     }
 }
 
@@ -273,18 +271,19 @@ impl List {
     }
 
     /// Convert the list into an element that iced can render
-    fn view(&self, slot_index: usize) -> Element<'_, Message> {
+    fn view(&self, slot_index: usize) -> impl Widget<Message> {
         let name = text(self.title.clone())
             .size(20)
             .style(theme::text::list_name);
         let location = TreeLocation::new(slot_index, TreeElement::List);
         let todos = column(self.todos.iter().enumerate().map(|(i, todo)| {
             todo.view(TreeLocation::new(slot_index, TreeElement::Todo(i)))
+                .boxed()
         }))
         .spacing(10.0)
         .width(Length::Fill)
         .height(Length::Shrink)
-        .push(self.adder(location));
+        .push(self.adder(location).boxed());
         let content = container(column![name, todos].spacing(20.0))
             .width(Length::Fill)
             .height(Length::Shrink)
@@ -301,10 +300,9 @@ impl List {
             .on_drag(move |p, r| Message::DragList(location, p, r))
             .on_cancel(Message::ListDropCanceled)
             .drag_hide(true)
-            .into()
     }
 
-    fn adder(&self, location: TreeLocation) -> Element<'_, Message> {
+    fn adder(&self, location: TreeLocation) -> impl Widget<Message> {
         let input = text_input("Add task...", self.todo_adder.text.as_str())
             .id(self.todo_adder.id.clone())
             .on_input(move |new_str| {
@@ -324,7 +322,7 @@ impl List {
             tooltip::Position::FollowCursor,
         )
         .style(theme::container::adder_tooltip);
-        row![input, spacing, add_btn].width(Length::Fill).into()
+        row![input, spacing, add_btn].width(Length::Fill)
     }
 }
 
@@ -360,7 +358,7 @@ impl Todo {
     }
 
     /// Convert the task into an element that iced can render
-    fn view(&self, location: TreeLocation) -> Element<'_, Message> {
+    fn view(&self, location: TreeLocation) -> impl Widget<Message> {
         let txt = text(&self.content)
             .size(15)
             .style(theme::text::todo)
@@ -385,7 +383,7 @@ impl Todo {
                 .on_cancel(Message::TodoDropCanceled)
                 .drag_hide(true)
                 .drag_size(Size::ZERO)
-                .into()
+                .boxed()
         } else {
             text_input("", &self.content)
                 .id(self.t_id.clone())
@@ -393,7 +391,7 @@ impl Todo {
                 .size(15)
                 .on_input(move |new_str| Message::UpdateTodo(location, new_str))
                 .on_submit(Message::StopEditingTodo)
-                .into()
+                .boxed()
         }
     }
 }

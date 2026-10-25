@@ -1,6 +1,6 @@
 use iced::Border;
 use iced::{
-    Element, Fill, Length, Point, Rectangle, Task,
+    Fill, Length, Point, Rectangle, Task, Widget,
     widget::Id,
     widget::{column, container, row, text},
 };
@@ -78,7 +78,7 @@ impl ColorDropper {
         Task::none()
     }
 
-    fn view(&self) -> Element<'_, Message> {
+    fn view(&self) -> impl Widget<Message> {
         let header = container(text("Color Dropper").size(30))
             .padding(10.0)
             .width(Length::Fill)
@@ -93,7 +93,6 @@ impl ColorDropper {
                     .height(Length::Fixed(COLORS_HEIGHT)),
             )
             .on_drop(move |point, rect| Message::DropColor(color, point, rect))
-            .into()
         });
         let colors_holder =
             container(column(colors).spacing(20.0).padding(20.0))
@@ -110,21 +109,16 @@ impl ColorDropper {
             .spacing(5)
         ]
         .padding(5)
-        .into()
     }
 }
 
-fn drop_zone<'a>(
-    color: DColor,
-    id: Id,
-) -> iced::Element<'a, Message, iced::Theme, iced::Renderer> {
+fn drop_zone(color: DColor, id: Id) -> impl Widget<Message> {
     container(text(color.fun_fact()).size(20))
         .style(move |_| color.style())
         .id(id)
         .width(Fill)
         .height(Fill)
         .center(Fill)
-        .into()
 }
 
 #[derive(Debug, Clone, Copy, Default)]
